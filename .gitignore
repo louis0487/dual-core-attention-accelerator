@@ -1,0 +1,35 @@
+# Foundry/NDA material — never commit (TSMC PDK, libraries, derived DB/netlists)
+*.lib
+*.lef
+*.db
+*.gds
+*.gds2
+*.tf
+*.techfile
+*.enc.dat/
+*.dat/
+*.spf
+*.spef
+*.cdl
+
+# Gate-level netlists mapped to foundry cells
+*.out.v
+*_netlist.v
+gate/
+netlist/
+
+# Tool state / caches / waves — huge and useless in a repo
+alib-52/
+*.shm/
+waves.shm/
+xcelium.d/
+*.vcd
+*.fsdb
+*.log
+*.logv
+*.cmd
+.simvision/
+.cadence/
+*.enc
+.template/
+template/
