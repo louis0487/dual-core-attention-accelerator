@@ -1,35 +1,30 @@
-# Foundry/NDA material — never commit (TSMC PDK, libraries, derived DB/netlists)
+# EDA build outputs — NDA red line: mapped netlists / PDK-derived files never enter this repo
+# (repo carries: RTL source, own tcl scripts, README/report numbers. Nothing tool-generated.)
+
+# synthesis / PnR / simulation outputs
+**/netlist/
+**/gls/
+*.enc
+*.enc.dat/
+*.dat/
+alib-52/
+xcelium.d/
+*.log
+*.rpt
+*.sdf
+*.spef
+*.def
+*.def.gz
+*.v.gz
+
+# library / foundry file classes (this repo needs none of them)
 *.lib
 *.lef
 *.db
+*.alib
 *.gds
-*.gds2
-*.tf
-*.techfile
-*.enc.dat/
-*.dat/
-*.spf
-*.spef
-*.cdl
-
-# Gate-level netlists mapped to foundry cells
-*.out.v
-*_netlist.v
-gate/
-netlist/
-
-# Tool state / caches / waves — huge and useless in a repo
-alib-52/
-*.shm/
-waves.shm/
-xcelium.d/
-*.vcd
-*.fsdb
-*.log
-*.logv
-*.cmd
-.simvision/
-.cadence/
-*.enc
-.template/
-template/
+*.captable
+tcbn65*
+sram_w16*
+sram_128b*
+sram_160b*
