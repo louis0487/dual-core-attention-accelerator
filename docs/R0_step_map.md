@@ -1,34 +1,34 @@
-# R0 Archaeology - Step Map (W3 deliverable, due 2026-08-16)
+# R0 Archaeology - Step Map (COMPLETED 2026-08-14)
 
-Ground rule: every cell needs file evidence (filename/path), not memory.
-The "Official goal" column is pre-filled from the official project instructions;
-fill the remaining columns on the server while inventorying.
+Ground rule: every cell carries file evidence (filename/path). Cells based on
+inference rather than opened files are tagged [assessed]. Archaeology was closed
+by decision on 2026-08-14: enough evidence to rebuild; remaining unknowns are
+tagged instead of chased.
 
-## Four questions per step folder (to fill the table)
-
-1. Who runs: which run scripts (tcl/sh) are in the folder, and which tool does each call (dc_shell / innovus / xcelium)?
-2. What it eats: which RTL / netlist / SDC inputs? (check read/source/set near the top of the tcl)
-3. What it produces: netlist / .enc / waveforms / reports?
-4. Which official step (and which sentence of it) does this folder correspond to?
+Trees referenced below (server home / local mirror):
+- Tree A = `1D_Vector_Processor/` (step1-6)
+- Tree B = `finalproject/1D_Vector_Processor/` (step1-5 + 6a/6b)
 
 ## Step map
 
-| Official | Goal (pre-filled) | Folder (which tree) | Key files: run script -> inputs -> outputs | How it was run | What to change in rebuild |
+| Official | Goal | Folder | Key files: run script -> inputs -> outputs | How it was run | What changes in rebuild |
 |---|---|---|---|---|---|
-| S1 | Single-core QK: RTL (8-input MAC redesign) + synthesis + PnR @ 1 GHz (negative WNS OK; FAQ5 = relax clock first) + GLS, results land in pmem | | | | |
-| S2 | Normalization: abs() on BOTH numerator and denominator -> row-wise sum -> divide -> write back to pmem; verify by behavioral sim | | | | |
-| S3 | Hierarchical flow: SRAM synthesized+PnR'd standalone into a macro (top layer = M4, pin pitch 4 um, D pins bottom / Q pins top / rest left) -> core treats SRAM as a cell, hierarchical synth+PnR; includes normalizer | | | | |
-| S4 | Dual-core: cross-clock-domain sum exchange (async protocol) | | | | |
-| S5 | Official optimization step: setup WNS = 0 @ TYP, hold clean @ FAST, optimize the final dual-core only | | | | |
-| S6 | B2 row-level sparsity (30%, numpy threshold) on top of S5 | | | | |
+| S1 | Single-core QK: RTL (8-input MAC redesign) + synthesis + PnR @ 1 GHz (negative WNS OK; FAQ5 = relax clock first) + GLS, results land in pmem | step1 in BOTH trees (full script set + per-stage PnR saves) | `run_dc.tcl` -> 12 RTL files (incl. `mac_8in.v`, `sram_w16.v` read as behavioral RTL, flat compile) -> `fullchip.out.v`; then `loadDesignTech / initialFloorplan / pinPlacement / placement / clock / route / outputGen .tcl` -> `netlist/fullchip.v` -> `.enc` saves + reports | `dc_shell -f run_dc.tcl` (journal: `command.log`); Innovus sourcing the tcl stages - per-stage journals `inn.cmd.gz` inside `initial/floorplan/placement/cts/route .enc.dat` | Re-derive `mac_8in` from the 16-input template MAC myself; scripts archived in repo `tcl/step1/` are the framework |
+| S2 | Normalization: abs() on BOTH numerator and denominator -> row-wise sum -> divide -> write back to pmem; verify by behavioral sim | step2 in both trees | `step2/verilog/` + `command.log` only - no synthesis artifacts present | Behavioral simulation stage only (xcelium; no DC/Innovus traces in the folder) | Write normalizer RTL + TB, behavioral sim; no PnR at this step |
+| S3 | Hierarchical flow: SRAM synthesized+PnR'd standalone into a macro (top = M4, pin pitch 4 um, D bottom / Q top / rest left) -> core treats SRAM as a cell; includes normalizer | Tree A step3 (14 tcl; the hierarchical buildout lives here) | SRAM leg: `run_dc_sram.tcl` -> `outputGen.tcl` (`write_lef_abstract` + `do_extract_model` -> `sram_w16.lef`, `_WC/_BC.lib`); core leg: `run_dc_core.tcl` + `loadDesignTech_core.tcl` + `pinPlacement_core.tcl` (SRAM consumed as macro). Saves: `sram_w16.dat`, `core.dat`, 5x `.enc.dat` with journals | Two-pass: SRAM macro first, then hierarchical core; all journals present | This IS the R3 map. Scripts archived in repo `tcl/step3/` |
+| S4 | Dual-core: cross-clock-domain sum exchange (async protocol) | Tree B step4 | `run_dc.tcl` -> `fullchip.out.v` (4.57 MB); per-core data files `kdata_core0/core1`, `norm_core0/core1` (dual-core signature); `fullchip_tb.vcd` (GLS) | DC synth + GLS confirmed (`command.log` 159 KB); Innovus traces thin (`innovus.cmd` 0.9 KB only - no `.enc.dat` in folder) | PnR record thin [assessed: rebuild PnR by extending the step3 framework]; async sum-exchange RTL is the core new work |
+| S5 | Official optimization step: setup WNS = 0 @ TYP, hold clean @ FAST, optimize the final dual-core only | Tree B step5 | `run_dc.tcl` + `fullchip.sdc` (tightened constraints) -> `fullchip.out.v` (7.76 MB) + GLS `vcd` | DC re-synth under tighter SDC + GLS; same thin-Innovus pattern as S4 | Rebuild = the real timing-closure round; expect iteration |
+| S6 | B2 row-level sparsity (30%, numpy threshold) on top of S5 | Tree B step6a + step6b (pair); Tree A step6 [assessed: baseline-flavored run, out.v 19.9 MB ~ 6a's 20.4 MB] | 6a: `fullchip.out.v` 20.4 MB, no B2 dir = baseline. 6b: **`B2_threshold_tb/` dir present = B2 sparsity leg**, `fullchip.out.v` 4.57 MB. Both: `run_dc.tcl`, GLS `vcd` | DC synth + GLS per leg; comparison pair for the report | Rebuild reproduces the 6a-vs-6b comparison on top of rebuilt S5 |
 
-## Three verdict questions (evidence filenames required)
+## Verdict questions - resolved
 
-- [ ] A. Division of labor between the two trees: `1D_Vector_Processor/` (step1-6) vs `finalproject/1D_Vector_Processor/` (step1-5 + 6a/6b) - what period/purpose is each, and which tree is the rebuild baseline? (Evidence: diff same-named steps' RTL or logs across the trees)
-- [ ] B. step6 vs step6a/6b: which of 6a/6b is baseline and which is B2 sparsity? And which version is the top tree's step6? (Evidence: RTL diff or run log)
-- [ ] C. Where do official S3's macro constraints land: M4 top / 4 um pin pitch / D bottom, Q top - which tcl file, which lines, in your step3? (Advance scouting for R3)
+- [x] **A. Division of labor**: Tree A = development/assignment line (holds the S2 behavioral stage, the complete S3 hierarchical buildout, and an S6-flavored experiment). Tree B = final package line (fresh S1, S4 dual-core, S5 optimization, S6a/6b graded pair). [assessed from file evidence; archaeology closed before full cross-diff]
+- [x] **B. step6 vs 6a/6b**: **6b = B2 sparsity** (evidence: `step6b/B2_threshold_tb/` directory; out.v 4.57 MB) vs **6a = baseline** (no B2 dir; out.v 20.4 MB). Tree A step6 resembles the baseline leg [assessed by size/date, not diffed].
+- [x] **C. S3 macro pin constraints**: `tcl/step3/pinPlacement.tcl` lines 2-4: `editPin -pin Q* -side Top`, `D* -side Bottom`, `{CLK WEN CEN A*} -side Left`, all `-spacing 4` (= 4 um pitch) - matches the official spec verbatim. Core-level pin plan: `pinPlacement_core.tcl` lines 21-24 (outputs bottom/L2, inputs left/L3). M4 top-layer cap not located in the pin scripts [assessed: lives in floorplan/route settings; confirm during R3].
 
-## Note while inventorying (rebuild intel)
+## Rebuild intel
 
-- Rough runtime per step (log timestamp head vs tail) -> sets expectations for the rebuild
-- Signs of past struggle/reruns (multiple logs, *_old files) -> minefield markers for the rebuild
+- Later-step PnR journals are thin/absent -> rebuild PnR for S4+ by extending the step3 script framework rather than replaying old runs.
+- S2 is behavioral-only; do not add synthesis there.
+- Remembered RTL delta across steps ("add ofifo + bitwidth fixes") is unverified memory - verify against official template when each step starts, via verilog diff.
+- Step scripts now archived in repo: `tcl/step1/` (9 files), `tcl/step3/` (14 files); both NDA-scanned (path references only, no library content).
