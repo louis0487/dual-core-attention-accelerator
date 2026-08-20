@@ -25,6 +25,21 @@ xcelium.d/
 *.gds
 *.captable
 tcbn65*
-sram_w16*
-sram_128b*
-sram_160b*
+# NOTE: do NOT add bare sram_w16*/sram_128b*/sram_160b* here.
+# Those are the course's own behavioral SRAM models (plain .v source the design
+# needs to compile). PDK SRAM macro views are covered by the extension rules
+# above (.lib/.lef/.db/.gds), so blocking the .v by name only broke the build.
+
+# simulation outputs (iverilog / xrun / gtkwave)
+*.vcd
+*.vvp
+*.fsdb
+*.shm/
+a.out
+
+# editor scratch
+*.swp
+.*.swp
+*.swo
+.*.swo
+*~
