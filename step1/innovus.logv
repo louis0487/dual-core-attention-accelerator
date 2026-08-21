@@ -1,0 +1,17 @@
+[08/21 00:10:30      0s] 
+[08/21 00:10:30      0s] Cadence Innovus(TM) Implementation System.
+[08/21 00:10:30      0s] Copyright 2021 Cadence Design Systems, Inc. All rights reserved worldwide.
+[08/21 00:10:30      0s] 
+[08/21 00:10:30      0s] Version:	v21.10-p004_1, built Tue May 18 11:58:29 PDT 2021
+[08/21 00:10:30      0s] Options:	
+[08/21 00:10:30      0s] Date:		Fri Aug 21 00:10:30 2026
+[08/21 00:10:30      0s] Host:		ieng6-ece-03.ucsd.edu (x86_64 w/Linux 3.10.0-1160.119.1.el7.x86_64) (4cores*8cpus*Intel(R) Xeon(R) Gold 5220 CPU @ 2.20GHz 25344KB)
+[08/21 00:10:30      0s] OS:		CentOS Linux release 7.9.2009 (Core)
+[08/21 00:10:30      0s] 
+[08/21 00:10:30      0s] License:
+[08/21 00:10:31      0s] **WARN: (IMPLIC-23):		Current status: 'ERROR (LMF-10097): License call failed for feature First_Encounter_VIP, version 21.100 and quantity 1. The license server search path is defined as <none>. The FLEXnet error message is as follows,
+[08/21 00:10:31      0s]     FLEXnet ERROR(-97, 234, 0): The desired vendor daemon is down.
+[08/21 00:10:31      0s] 
+[08/21 00:10:31      0s] Run 'lic_error LMF-10097' for more information.' (-97)
+[08/21 00:10:31      0s] 		Fail to find any innovus license...
+[08/21 00:10:31      0s] 		Check your Innovus license status.

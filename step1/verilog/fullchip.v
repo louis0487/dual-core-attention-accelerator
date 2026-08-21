@@ -1,6 +1,6 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
-module fullchip (clk, mem_in, inst, reset);
+module fullchip (clk, mem_in, inst, reset, out);
 
 parameter col = 8;
 parameter bw = 8;
