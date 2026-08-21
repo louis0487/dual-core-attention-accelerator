@@ -68,6 +68,12 @@ reg [bw_psum-1:0] temp5b;
 reg [bw_psum+3:0] temp_sum;
 reg [bw_psum*col-1:0] temp16b;
 
+// readout path: chip output port, expected rows, and self-check counters
+wire [bw_psum*col-1:0] out;
+reg  [bw_psum*col-1:0] golden [total_cycle-1:0];
+integer errors;
+integer pass_cnt;
+
 
 
 fullchip #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) fullchip_instance (
@@ -93,11 +99,6 @@ $display("##### Q data txt reading #####");
 
   qk_file = $fopen("qdata.txt", "r");
 
-  //// To get rid of first 3 lines in data file ////
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
 
 
   for (q=0; q<total_cycle; q=q+1) begin
@@ -132,11 +133,6 @@ $display("##### K data txt reading #####");
 
   qk_file = $fopen("kdata.txt", "r");
 
-  //// To get rid of first 4 lines in data file ////
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
-  qk_scan_file = $fscanf(qk_file, "%s\n", captured_data);
 
 
 
@@ -179,6 +175,7 @@ $display("##### Estimated multiplication result #####");
      end
 
      //$display("%d %d %d %d %d %d %d %d", result[t][0], result[t][1], result[t][2], result[t][3], result[t][4], result[t][5], result[t][6], result[t][7]);
+     golden[t] = temp16b;
      $display("prd @cycle%2d: %40h", t, temp16b);
   end
 
@@ -206,14 +203,6 @@ $display("##### Qmem writing  #####");
     mem_in[6*bw-1:5*bw] = Q[q][5];
     mem_in[7*bw-1:6*bw] = Q[q][6];
     mem_in[8*bw-1:7*bw] = Q[q][7];
-    mem_in[9*bw-1:8*bw] = Q[q][8];
-    mem_in[10*bw-1:9*bw] = Q[q][9];
-    mem_in[11*bw-1:10*bw] = Q[q][10];
-    mem_in[12*bw-1:11*bw] = Q[q][11];
-    mem_in[13*bw-1:12*bw] = Q[q][12];
-    mem_in[14*bw-1:13*bw] = Q[q][13];
-    mem_in[15*bw-1:14*bw] = Q[q][14];
-    mem_in[16*bw-1:15*bw] = Q[q][15];
 
     #0.5 clk = 1'b1;  
 
@@ -247,14 +236,6 @@ $display("##### Kmem writing #####");
     mem_in[6*bw-1:5*bw] = K[q][5];
     mem_in[7*bw-1:6*bw] = K[q][6];
     mem_in[8*bw-1:7*bw] = K[q][7];
-    mem_in[9*bw-1:8*bw] = K[q][8];
-    mem_in[10*bw-1:9*bw] = K[q][9];
-    mem_in[11*bw-1:10*bw] = K[q][10];
-    mem_in[12*bw-1:11*bw] = K[q][11];
-    mem_in[13*bw-1:12*bw] = K[q][12];
-    mem_in[14*bw-1:13*bw] = K[q][13];
-    mem_in[15*bw-1:14*bw] = K[q][14];
-    mem_in[16*bw-1:15*bw] = K[q][15];
 
     #0.5 clk = 1'b1;  
 
@@ -358,6 +339,55 @@ $display("##### move ofifo to pmem #####");
   #0.5 clk = 1'b0;  
   pmem_wr = 0; pmem_add = 0; ofifo_rd = 0;
   #0.5 clk = 1'b1;  
+
+///////////////////////////////////////////
+
+
+
+
+///////// readout from pmem and self-check ///////////
+
+$display("##### readout from pmem #####");
+
+  errors   = 0;
+  pass_cnt = 0;
+
+  // pmem is a synchronous-read SRAM (Q <= memory[A] on posedge), so a word
+  // requested at one posedge is only stable in the next time step. The loop
+  // runs one extra iteration: it checks the row requested in the previous
+  // iteration, then issues the next address.
+  for (q=0; q<total_cycle+1; q=q+1) begin
+
+    #0.5 clk = 1'b0;  
+
+    if (q>0) begin
+      if (out === golden[q-1]) begin
+        pass_cnt = pass_cnt + 1;
+        $display("row %0d PASS: %40h", q-1, out);
+      end
+      else begin
+        errors = errors + 1;
+        $display("row %0d FAIL: got %40h exp %40h", q-1, out, golden[q-1]);
+      end
+    end
+
+    if (q<total_cycle) begin
+      pmem_rd  = 1; 
+      pmem_add = q; 
+    end
+    else begin
+      pmem_rd = 0; 
+    end
+
+    #0.5 clk = 1'b1;  
+
+  end
+
+  #0.5 clk = 1'b0;  
+  pmem_rd = 0; pmem_add = 0;
+  #0.5 clk = 1'b1;  
+
+  $display("##### RESULT: %0d PASS / %0d FAIL #####", pass_cnt, errors);
 
 ///////////////////////////////////////////
 
