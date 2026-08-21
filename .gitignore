@@ -36,6 +36,14 @@ tcbn65*
 *.fsdb
 *.shm/
 a.out
+*.out.v
+*.pnr.v
+*.rep
+**/gate/
+**/template/
+log/
+.template/
+*.svf
 
 # editor scratch
 *.swp
