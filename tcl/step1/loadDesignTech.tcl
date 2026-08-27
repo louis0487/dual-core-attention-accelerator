@@ -1,6 +1,5 @@
 # Load design
-set desdir 		"/home/linux/ieng6/ECE260B_WI26_A00/public/DESIGNdata"
-set libdir 		"/home/linux/ieng6/ECE260B_WI26_A00/public/PDKdata"
+set libdir 		$env(COURSE_PDK)
 set design 		"fullchip"
 set netlist 		"./netlist/$design.v"
 set sdc 		"./constraints/$design.sdc"
