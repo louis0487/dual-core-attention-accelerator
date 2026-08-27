@@ -46,7 +46,7 @@ assign pmem_rd = inst[1];
 assign pmem_wr = inst[0];
 
 assign mac_in  = inst[6] ? kmem_out : qmem_out;
-assign pmem_in = fifo_out;
+assign pmem_in = pmem_wr ? sfp_out : fifo_out;
 assign out = pmem_out;
 
 mac_array #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) mac_array_instance (
@@ -94,6 +94,15 @@ sram_w16 #(.sram_bit(col*bw_psum)) psum_mem_instance (
         .CEN(!(pmem_rd||pmem_wr)),
         .WEN(!pmem_wr), 
         .A(pmem_add)
+);
+
+sfp_row #(.col(col), .bw(bw), .bw_psum(bw_psum)) sfp_row_instance (
+	.clk(clk),
+	.reset(reset),
+	.sfp_in(pmem_out),
+	.sum_in(pmem_out),
+	.sum_out(out),
+	.sfp_out(sfp_out)
 );
 
 
