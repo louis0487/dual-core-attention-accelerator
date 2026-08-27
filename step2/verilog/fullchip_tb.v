@@ -79,6 +79,12 @@ reg  [bw_psum*col-1:0] golden [total_cycle-1:0];
 integer errors;
 integer pass_cnt;
 
+// step 2: expected normalized rows and the scratch used to build them
+reg  [bw_psum*col-1:0] golden_norm [total_cycle-1:0];
+reg  [bw_psum*col-1:0] temp16bn;
+integer sum_abs;
+integer divisor;
+
 
 
 fullchip #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) fullchip_instance (
@@ -182,6 +188,32 @@ $display("##### Estimated multiplication result #####");
      //$display("%d %d %d %d %d %d %d %d", result[t][0], result[t][1], result[t][2], result[t][3], result[t][4], result[t][5], result[t][6], result[t][7]);
      golden[t] = temp16b;
      $display("prd @cycle%2d: %40h", t, temp16b);
+  end
+
+//////////////////////////////////////////////
+
+
+///// Estimated normalized result /////
+
+$display("##### Estimated normalized result #####");
+
+  for (t=0; t<total_cycle; t=t+1) begin
+     sum_abs = 0;
+     for (q=0; q<col; q=q+1)
+        sum_abs = sum_abs + ((result[t][q] < 0) ? -result[t][q] : result[t][q]);
+
+     // the rtl divides by sum >> 7, so model exactly that - including the truncation
+     divisor = sum_abs >> 7;
+     if (divisor == 0)
+        $display("WARNING row %0d: divisor is 0, the rtl divide will produce x", t);
+
+     for (q=0; q<col; q=q+1) begin
+        temp5b   = ((result[t][q] < 0) ? -result[t][q] : result[t][q]) / divisor;
+        temp16bn = {temp16bn[139:0], temp5b};
+     end
+
+     golden_norm[t] = temp16bn;
+     $display("nrm @cycle%2d: %40h", t, temp16bn);
   end
 
 //////////////////////////////////////////////
@@ -393,6 +425,119 @@ $display("##### readout from pmem #####");
   #0.5 clk = 1'b1;  
 
   $display("##### RESULT: %0d PASS / %0d FAIL #####", pass_cnt, errors);
+
+///////////////////////////////////////////
+
+
+
+///// normalize pass A: one sum per row into the sum fifo /////
+
+$display("##### normalize pass A: accumulate #####");
+
+  // pmem is a synchronous-read sram, so address a row one cycle before its
+  // data is needed. This first edge only primes row 0.
+  #0.5 clk = 1'b0;  
+  pmem_rd  = 1; 
+  pmem_add = 0; 
+  #0.5 clk = 1'b1;  
+
+  for (q=0; q<total_cycle; q=q+1) begin
+    #0.5 clk = 1'b0;  
+    acc = 1;                    // sfp_in currently holds row q
+    if (q < total_cycle-1) begin
+      pmem_rd  = 1;             // fetch row q+1 while row q accumulates
+      pmem_add = q + 1; 
+    end
+    else pmem_rd = 0; 
+    #0.5 clk = 1'b1;  
+  end
+
+  // fifo_wr is still high for one more edge, which is where row 7 s sum lands
+  #0.5 clk = 1'b0;  
+  acc = 0; pmem_add = 0;
+  #0.5 clk = 1'b1;  
+
+///////////////////////////////////////////
+
+
+///// normalize pass B: divide each row by its own sum and write it back /////
+
+$display("##### normalize pass B: divide and write back #####");
+
+  // div has to be a one cycle pulse. div_q pops the sum fifo one cycle later,
+  // so holding div high would divide two consecutive rows by the same sum.
+  for (q=0; q<total_cycle; q=q+1) begin
+
+    // address the row
+    #0.5 clk = 1'b0;  
+    pmem_rd  = 1; 
+    pmem_wr  = 0; 
+    norm     = 0; 
+    pmem_add = q; 
+    #0.5 clk = 1'b1;  
+
+    // divide: sfp_out registers |row q| / (sum_q >> 7)
+    #0.5 clk = 1'b0;  
+    pmem_rd = 0; 
+    div     = 1; 
+    #0.5 clk = 1'b1;  
+
+    // write the registered result back to the same address; the fifo pops here
+    #0.5 clk = 1'b0;  
+    div      = 0; 
+    norm     = 1; 
+    pmem_wr  = 1; 
+    pmem_add = q; 
+    #0.5 clk = 1'b1;  
+
+  end
+
+  #0.5 clk = 1'b0;  
+  norm = 0; pmem_wr = 0; pmem_add = 0;
+  #0.5 clk = 1'b1;  
+
+///////////////////////////////////////////
+
+
+///// readout after normalization /////
+
+$display("##### readout after normalization #####");
+
+  errors   = 0;
+  pass_cnt = 0;
+
+  for (q=0; q<total_cycle+1; q=q+1) begin
+
+    #0.5 clk = 1'b0;  
+
+    if (q>0) begin
+      if (out === golden_norm[q-1]) begin
+        pass_cnt = pass_cnt + 1;
+        $display("norm row %0d PASS: %40h", q-1, out);
+      end
+      else begin
+        errors = errors + 1;
+        $display("norm row %0d FAIL: got %40h exp %40h", q-1, out, golden_norm[q-1]);
+      end
+    end
+
+    if (q<total_cycle) begin
+      pmem_rd  = 1; 
+      pmem_add = q; 
+    end
+    else begin
+      pmem_rd = 0; 
+    end
+
+    #0.5 clk = 1'b1;  
+
+  end
+
+  #0.5 clk = 1'b0;  
+  pmem_rd = 0; pmem_add = 0;
+  #0.5 clk = 1'b1;  
+
+  $display("##### NORM RESULT: %0d PASS / %0d FAIL #####", pass_cnt, errors);
 
 ///////////////////////////////////////////
 
