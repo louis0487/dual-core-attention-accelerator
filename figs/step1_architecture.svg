@@ -1,0 +1,237 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1075" width="1400" height="1075" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#1f2328">
+<title>ECE260B step 1 single-core Q x K^T accelerator architecture</title>
+<desc>Block diagram of the single-core 8-input MAC K-stationary systolic accelerator: q_mem and k_mem SRAMs feed a 2:1 mux into an 8-column mac_array, column outputs go through an 8-lane ofifo into pmem, and pmem drives the new top-level output port. Includes inst decode table, TB phase sequence, and change list versus the course template.</desc>
+<defs>
+<marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#57606a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+<marker id="aa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#ba7517" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="1075" fill="#ffffff"/>
+
+<text x="100" y="30" font-size="16" font-weight="600">ECE260B step 1 - single-core Q x K^T accelerator (8-input MAC, K-stationary systolic array)</text>
+<text x="100" y="48" fill="#57606a">Template backbone (ece260_project) with rebuild changes marked CHANGED / NEW.  Params: bw=8, pr=8 (was 16), col=8, bw_psum=20 (19 needed), total_cycle=8.</text>
+<text x="100" y="64" fill="#57606a">Widths: element 8b, vector = pr*bw = 64b, psum = 20b, row = col*bw_psum = 160b.  Single clock domain (clk, reset to all blocks).  Ports: inputs west, outputs south (PnR spec).</text>
+
+<rect x="100" y="80" width="1180" height="600" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="6 4"/>
+<text x="110" y="97" font-size="13" font-weight="600">fullchip (top)</text>
+<rect x="130" y="110" width="1130" height="550" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="6 4"/>
+<text x="140" y="127" font-size="13" font-weight="600">core</text>
+
+<text x="42" y="125" font-size="11.5">clk (all blocks)</text>
+<line x1="40" y1="130" x2="130" y2="130" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="42" y="147" font-size="11.5">reset (all blocks)</text>
+<line x1="40" y1="152" x2="130" y2="152" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<text x="42" y="209" font-size="11.5">mem_in[63:0]</text>
+<line x1="40" y1="215" x2="160" y2="215" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<polyline points="150,215 150,325 160,325" fill="none" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="38" y="238" font-size="11" fill="#854f0b">CHANGED: was 128b</text>
+
+<text x="42" y="464" font-size="11.5">inst[16:0]</text>
+<line x1="40" y1="470" x2="160" y2="470" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<rect x="160" y="175" width="175" height="85" rx="4" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="247" y="194" text-anchor="middle" font-size="13" font-weight="600" fill="#0c447c">q_mem  (sram_w16)</text>
+<text x="247" y="211" text-anchor="middle" fill="#185fa5">16 words x 64b (was 128b)</text>
+<text x="247" y="228" text-anchor="middle" fill="#185fa5">D=mem_in  A=inst[15:12]</text>
+<text x="247" y="245" text-anchor="middle" fill="#185fa5">rd=inst[5]  wr=inst[4]</text>
+
+<rect x="160" y="285" width="175" height="85" rx="4" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="247" y="304" text-anchor="middle" font-size="13" font-weight="600" fill="#0c447c">k_mem  (sram_w16)</text>
+<text x="247" y="321" text-anchor="middle" fill="#185fa5">16 words x 64b (was 128b)</text>
+<text x="247" y="338" text-anchor="middle" fill="#185fa5">D=mem_in  A=inst[15:12]</text>
+<text x="247" y="355" text-anchor="middle" fill="#185fa5">rd=inst[3]  wr=inst[2]</text>
+
+<line x1="335" y1="225" x2="380" y2="225" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="346" y="220" font-size="11" fill="#57606a">64b</text>
+<polyline points="335,325 360,325 360,285 380,285" fill="none" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="338" y="338" font-size="11" fill="#57606a">64b</text>
+
+<polygon points="380,205 430,225 430,285 380,305" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="386" y="229" font-size="11" fill="#57606a">0</text>
+<text x="386" y="289" font-size="11" fill="#57606a">1</text>
+<text x="408" y="259" text-anchor="middle" font-weight="600">mux</text>
+<text x="412" y="319" text-anchor="middle" font-size="11" fill="#57606a">sel=inst[6]</text>
+
+<polyline points="430,255 470,255 470,229 500,229" fill="none" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="432" y="272" font-size="11" fill="#57606a">mac_in[63:0]</text>
+
+<rect x="480" y="140" width="560" height="325" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="6 4"/>
+<text x="490" y="158" font-size="13" font-weight="600">mac_array: 8 x mac_col systolic chain (data 64b + inst 2b, 1 cycle per column)</text>
+
+<g>
+<rect x="500" y="170" width="150" height="270" rx="4" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="575" y="190" text-anchor="middle" font-size="13" font-weight="600" fill="#26215c">mac_col  col_id=1</text>
+<text x="575" y="206" text-anchor="middle" font-size="11.5" fill="#534ab7">stationary key: K7</text>
+<rect x="510" y="216" width="130" height="26" rx="3" fill="#ffffff" stroke="#7f77dd" stroke-width="0.8"/>
+<text x="575" y="233" text-anchor="middle" fill="#26215c">query_q [63:0]</text>
+<rect x="510" y="250" width="130" height="26" rx="3" fill="#ffffff" stroke="#7f77dd" stroke-width="0.8"/>
+<text x="575" y="267" text-anchor="middle" fill="#26215c">key_q [63:0]</text>
+<rect x="510" y="284" width="130" height="40" rx="3" fill="#faeeda" stroke="#ba7517" stroke-width="0.8"/>
+<text x="575" y="300" text-anchor="middle" font-weight="600" fill="#412402">mac_8in  CHANGED</text>
+<text x="575" y="316" text-anchor="middle" font-size="11.5" fill="#854f0b">8 mult + adder tree</text>
+<text x="575" y="344" text-anchor="middle" fill="#26215c">psum[19:0]</text>
+<text x="575" y="360" text-anchor="middle" font-size="11.5" fill="#534ab7">fifo_wr = exec z^-2</text>
+<text x="575" y="380" text-anchor="middle" font-size="11.5" fill="#534ab7">inst[1:0]: exec, load</text>
+<text x="575" y="398" text-anchor="middle" font-size="11.5" fill="#534ab7">1 cyc delay per col</text>
+<text x="575" y="418" text-anchor="middle" font-size="11.5" fill="#534ab7">K latched @ load cyc 9</text>
+</g>
+
+<line x1="650" y1="229" x2="670" y2="229" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<line x1="650" y1="385" x2="670" y2="385" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<g>
+<rect x="670" y="170" width="150" height="270" rx="4" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="745" y="190" text-anchor="middle" font-size="13" font-weight="600" fill="#26215c">mac_col  col_id=2</text>
+<text x="745" y="206" text-anchor="middle" font-size="11.5" fill="#534ab7">stationary key: K6</text>
+<rect x="680" y="216" width="130" height="26" rx="3" fill="#ffffff" stroke="#7f77dd" stroke-width="0.8"/>
+<text x="745" y="233" text-anchor="middle" fill="#26215c">query_q [63:0]</text>
+<rect x="680" y="250" width="130" height="26" rx="3" fill="#ffffff" stroke="#7f77dd" stroke-width="0.8"/>
+<text x="745" y="267" text-anchor="middle" fill="#26215c">key_q [63:0]</text>
+<rect x="680" y="284" width="130" height="40" rx="3" fill="#faeeda" stroke="#ba7517" stroke-width="0.8"/>
+<text x="745" y="300" text-anchor="middle" font-weight="600" fill="#412402">mac_8in  CHANGED</text>
+<text x="745" y="316" text-anchor="middle" font-size="11.5" fill="#854f0b">8 mult + adder tree</text>
+<text x="745" y="344" text-anchor="middle" fill="#26215c">psum[19:0]</text>
+<text x="745" y="360" text-anchor="middle" font-size="11.5" fill="#534ab7">fifo_wr = exec z^-2</text>
+<text x="745" y="380" text-anchor="middle" font-size="11.5" fill="#534ab7">inst[1:0]: exec, load</text>
+<text x="745" y="398" text-anchor="middle" font-size="11.5" fill="#534ab7">1 cyc delay per col</text>
+<text x="745" y="418" text-anchor="middle" font-size="11.5" fill="#534ab7">K latched @ load cyc 8</text>
+</g>
+
+<line x1="820" y1="229" x2="838" y2="229" stroke="#57606a" stroke-width="1.2"/>
+<text x="850" y="233" text-anchor="middle" font-size="14" fill="#57606a">...</text>
+<line x1="862" y1="229" x2="880" y2="229" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<line x1="820" y1="385" x2="838" y2="385" stroke="#57606a" stroke-width="1.2"/>
+<text x="850" y="389" text-anchor="middle" font-size="14" fill="#57606a">...</text>
+<line x1="862" y1="385" x2="880" y2="385" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<g>
+<rect x="880" y="170" width="150" height="270" rx="4" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="955" y="190" text-anchor="middle" font-size="13" font-weight="600" fill="#26215c">mac_col  col_id=8</text>
+<text x="955" y="206" text-anchor="middle" font-size="11.5" fill="#534ab7">stationary key: K0</text>
+<rect x="890" y="216" width="130" height="26" rx="3" fill="#ffffff" stroke="#7f77dd" stroke-width="0.8"/>
+<text x="955" y="233" text-anchor="middle" fill="#26215c">query_q [63:0]</text>
+<rect x="890" y="250" width="130" height="26" rx="3" fill="#ffffff" stroke="#7f77dd" stroke-width="0.8"/>
+<text x="955" y="267" text-anchor="middle" fill="#26215c">key_q [63:0]</text>
+<rect x="890" y="284" width="130" height="40" rx="3" fill="#faeeda" stroke="#ba7517" stroke-width="0.8"/>
+<text x="955" y="300" text-anchor="middle" font-weight="600" fill="#412402">mac_8in  CHANGED</text>
+<text x="955" y="316" text-anchor="middle" font-size="11.5" fill="#854f0b">8 mult + adder tree</text>
+<text x="955" y="344" text-anchor="middle" fill="#26215c">psum[19:0]</text>
+<text x="955" y="360" text-anchor="middle" font-size="11.5" fill="#534ab7">fifo_wr = exec z^-2</text>
+<text x="955" y="380" text-anchor="middle" font-size="11.5" fill="#534ab7">inst[1:0]: exec, load</text>
+<text x="955" y="398" text-anchor="middle" font-size="11.5" fill="#534ab7">1 cyc delay per col</text>
+<text x="955" y="418" text-anchor="middle" font-size="11.5" fill="#534ab7">K latched @ load cyc 2</text>
+</g>
+
+<rect x="160" y="395" width="280" height="225" rx="4" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="172" y="414" font-size="13" font-weight="600">inst[16:0]  (driver = TB in step 1)</text>
+<text x="172" y="434">[16] ofifo_rd -> ofifo.rd</text>
+<text x="172" y="452">[15:12] qkmem_add -> q_mem.A, k_mem.A</text>
+<text x="172" y="470">[11:8] pmem_add -> pmem.A</text>
+<text x="172" y="488">[7] execute -> mac_array inst[1]</text>
+<text x="172" y="506">[6] load -> mac_array inst[0], mux sel</text>
+<text x="172" y="524">[5] qmem_rd   [4] qmem_wr</text>
+<text x="172" y="542">[3] kmem_rd   [2] kmem_wr</text>
+<text x="172" y="560">[1] pmem_rd   [0] pmem_wr</text>
+<text x="172" y="582" font-size="11.5" fill="#57606a">SRAM: CEN = !(rd|wr), WEN = !wr</text>
+<text x="172" y="600" font-size="11.5" fill="#57606a">step 5: replace TB with on-chip FSM</text>
+
+<polyline points="440,488 470,488 470,385 500,385" fill="none" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="446" y="380" font-size="11" fill="#57606a">inst[7:6]</text>
+
+<line x1="575" y1="440" x2="575" y2="485" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="580" y="478" font-size="11" fill="#57606a">20b + wr</text>
+<line x1="745" y1="440" x2="745" y2="485" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="850" y="474" text-anchor="middle" font-size="14" fill="#57606a">...</text>
+<line x1="955" y1="440" x2="955" y2="485" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<rect x="480" y="485" width="560" height="72" rx="4" fill="#e1f5ee" stroke="#0f6e56" stroke-width="1"/>
+<text x="492" y="504" font-size="13" font-weight="600" fill="#04342c">ofifo: 8 lanes x fifo_depth16 (20b/lane) - re-aligns systolic skew</text>
+<text x="492" y="522" font-size="11.5" fill="#0f6e56">wr[i] = col_id i+1 fifo_wr;  rd = inst[16] pops all lanes;  out[159:0] = lane heads (comb.)</text>
+<text x="492" y="540" font-size="11" fill="#0f6e56">lane j = out[20j+19:20j] = Q.K(7-j);  MSB lane = K0 (= TB prd hex order);  o_valid = all non-empty</text>
+
+<line x1="1040" y1="520" x2="1070" y2="520" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+<text x="1044" y="515" font-size="11" fill="#57606a">160b</text>
+
+<rect x="1070" y="475" width="180" height="90" rx="4" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="1160" y="494" text-anchor="middle" font-size="13" font-weight="600" fill="#0c447c">pmem  (sram_w16)</text>
+<text x="1160" y="511" text-anchor="middle" fill="#185fa5">16 words x 160b (unchanged)</text>
+<text x="1160" y="528" text-anchor="middle" fill="#185fa5">D=ofifo.out  A=inst[11:8]</text>
+<text x="1160" y="545" text-anchor="middle" fill="#185fa5">rd=inst[1]  wr=inst[0]</text>
+
+<line x1="1160" y1="565" x2="1160" y2="725" stroke="#ba7517" stroke-width="1.4" marker-end="url(#aa)"/>
+<text x="1152" y="600" text-anchor="end" font-size="11.5" fill="#854f0b">pmem.Q -> core.out[159:0]  NEW wire</text>
+<text x="1152" y="700" text-anchor="end" font-size="11.5" fill="#854f0b">fullchip.out[159:0]  NEW south port</text>
+<text x="1168" y="730" font-size="12" font-weight="600" fill="#854f0b">out[159:0]</text>
+
+<text x="100" y="762" font-size="13" font-weight="600">Sequence, TB = controller (from fullchip_tb.v; idle gaps between phases omitted)</text>
+
+<rect x="100" y="775" width="186" height="105" rx="4" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="108" y="793" font-weight="600">1. Q write - 8 cyc</text>
+<text x="108" y="811" font-size="11.5">qmem_wr, addr 0..7</text>
+<text x="108" y="829" font-size="11.5">mem_in = Q[t] (64b)</text>
+<line x1="288" y1="827" x2="298" y2="827" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<rect x="298" y="775" width="186" height="105" rx="4" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="306" y="793" font-weight="600">2. K write - 8 cyc</text>
+<text x="306" y="811" font-size="11.5">kmem_wr, addr 0..7</text>
+<text x="306" y="829" font-size="11.5">mem_in = K[j] (64b)</text>
+<line x1="486" y1="827" x2="496" y2="827" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<rect x="496" y="775" width="186" height="105" rx="4" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="504" y="793" font-weight="600">3. K load - col+1 = 9 cyc</text>
+<text x="504" y="811" font-size="11.5">load=1; kmem_rd from cyc 2</text>
+<text x="504" y="829" font-size="11.5">cyc 1 absorbs SRAM latency</text>
+<text x="504" y="847" font-size="11.5">col i latches K(8-i)</text>
+<text x="504" y="865" font-size="11.5">at its local cyc 10-i</text>
+<line x1="684" y1="827" x2="694" y2="827" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<rect x="694" y="775" width="186" height="105" rx="4" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="702" y="793" font-weight="600">4. execute - 8 cyc</text>
+<text x="702" y="811" font-size="11.5">execute + qmem_rd, addr 0..7</text>
+<text x="702" y="829" font-size="11.5">row t reaches col i lane</text>
+<text x="702" y="847" font-size="11.5">at cyc t+i+1 (skew 1/col)</text>
+<line x1="882" y1="827" x2="892" y2="827" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<rect x="892" y="775" width="186" height="105" rx="4" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="900" y="793" font-weight="600">5. drain - 8 cyc</text>
+<text x="900" y="811" font-size="11.5">ofifo_rd + pmem_wr</text>
+<text x="900" y="829" font-size="11.5">addr 0..7: one full row</text>
+<text x="900" y="847" font-size="11.5">(160b) per cycle -> pmem[t]</text>
+<line x1="1080" y1="827" x2="1090" y2="827" stroke="#57606a" stroke-width="1.2" marker-end="url(#ag)"/>
+
+<rect x="1090" y="775" width="186" height="105" rx="4" fill="#faeeda" stroke="#ba7517" stroke-width="1"/>
+<text x="1098" y="793" font-weight="600" fill="#412402">6. readout - NEW (TB todo)</text>
+<text x="1098" y="811" font-size="11.5" fill="#854f0b">pmem_rd, addr t</text>
+<text x="1098" y="829" font-size="11.5" fill="#854f0b">-> out valid next cycle</text>
+<text x="1098" y="847" font-size="11.5" fill="#854f0b">compare with TB estimate</text>
+<text x="1098" y="865" font-size="11.5" fill="#854f0b">prd @cycle t (same hex order)</text>
+
+<rect x="100" y="900" width="720" height="125" rx="4" fill="#faeeda" stroke="#ba7517" stroke-width="1"/>
+<text x="108" y="918" font-weight="600" fill="#412402">Rebuild changes vs template (what M1 touches)</text>
+<text x="108" y="936" font-size="11.5" fill="#412402">pr 16 -> 8 (FAQ29): fullchip/core/TB parameters; mem_in, q_mem, k_mem 128b -> 64b; pmem stays 160b</text>
+<text x="108" y="953" font-size="11.5" fill="#412402">mac_16in -> mac_8in: new module, 8 signed products + adder tree, out 20b (19b needed: 16b product + 3b for 8-way sum)</text>
+<text x="108" y="970" font-size="11.5" fill="#412402">core.out &lt;- pmem.Q and new fullchip out[159:0] south port (template: core.out floating, no top output = zero-power trap)</text>
+<text x="108" y="987" font-size="11.5" fill="#412402">TB: add readout phase (pmem_rd -> out) + self-check against estimated prd; TB stays the controller (on-chip FSM = step 5)</text>
+<text x="108" y="1004" font-size="11.5" fill="#412402">Deferred: SRAM depth 16 -> 8 (area); sfp_row / sum_out stay unused until step 2; reset false path per FAQ10 at PnR</text>
+<text x="108" y="1021" font-size="11.5" fill="#412402">Decision: out = one full row (160b) - simplest for TB compare; serializing the port is a step 5 option</text>
+
+<rect x="840" y="900" width="440" height="125" rx="4" fill="#f6f8fa" stroke="#57606a" stroke-width="1"/>
+<text x="848" y="918" font-weight="600">Reuse: Norm x V on the same hardware (FAQ32)</text>
+<text x="848" y="936" font-size="11.5">q_mem &lt;- normalized rows (norm.txt), k_mem &lt;- V as 8 key vectors</text>
+<text x="848" y="953" font-size="11.5">(K side = columns of V, i.e. rows of V^T; verify vdata.txt layout in TB)</text>
+<text x="848" y="970" font-size="11.5">phases 1-6 unchanged, only file contents differ; no new hardware</text>
+<text x="848" y="987" font-size="11.5">after step 2 the normalized rows come from pmem instead of a file</text>
+<text x="848" y="1004" font-size="11.5">FAQ1: norm(Q.K) output = one row per cycle; Norm x V output = Z1, Z2, ...</text>
+
+<rect x="100" y="1046" width="12" height="12" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="118" y="1056" font-size="11.5" fill="#57606a">SRAM</text>
+<rect x="170" y="1046" width="12" height="12" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="188" y="1056" font-size="11.5" fill="#57606a">compute</text>
+<rect x="255" y="1046" width="12" height="12" fill="#e1f5ee" stroke="#0f6e56" stroke-width="1"/>
+<text x="273" y="1056" font-size="11.5" fill="#57606a">FIFO</text>
+<rect x="320" y="1046" width="12" height="12" fill="#faeeda" stroke="#ba7517" stroke-width="1"/>
+<text x="338" y="1056" font-size="11.5" fill="#57606a">CHANGED / NEW vs template</text>
+<rect x="500" y="1046" width="12" height="12" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="518" y="1056" font-size="11.5" fill="#57606a">hierarchy boundary</text>
+<text x="660" y="1056" font-size="11.5" fill="#57606a">Sources: fullchip.v, core.v, mac_array.v, mac_col.v, mac_16in.v, ofifo.v, fifo_depth16.v, sram_w16.v, fullchip_tb.v (course template)</text>
+</svg>
