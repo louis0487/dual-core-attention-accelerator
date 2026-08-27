@@ -12,7 +12,7 @@ output [bw_psum*col-1:0] out;
 wire   [bw_psum*col-1:0] pmem_out;
 input  [pr*bw-1:0] mem_in;
 input  clk;
-input  [16:0] inst; 
+input  [19:0] inst; 
 input  reset;
 
 wire  [pr*bw-1:0] mac_in;
@@ -33,7 +33,13 @@ wire  kmem_rd;
 wire  kmem_wr; 
 wire  pmem_rd;
 wire  pmem_wr; 
+wire  norm;
+wire  acc;
+wire  div;
 
+assign norm = inst[19];
+assign div  = inst[18];
+assign acc  = inst[17];
 assign ofifo_rd = inst[16];
 assign qkmem_add = inst[15:12];
 assign pmem_add = inst[11:8];
@@ -46,7 +52,7 @@ assign pmem_rd = inst[1];
 assign pmem_wr = inst[0];
 
 assign mac_in  = inst[6] ? kmem_out : qmem_out;
-assign pmem_in = pmem_wr ? sfp_out : fifo_out;
+assign pmem_in = norm ? sfp_out : fifo_out;
 assign out = pmem_out;
 
 mac_array #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) mac_array_instance (
@@ -100,9 +106,12 @@ sfp_row #(.col(col), .bw(bw), .bw_psum(bw_psum)) sfp_row_instance (
 	.clk(clk),
 	.reset(reset),
 	.sfp_in(pmem_out),
-	.sum_in(pmem_out),
-	.sum_out(out),
-	.sfp_out(sfp_out)
+	.sum_in(0),
+	.sum_out(sum_out),
+	.sfp_out(sfp_out),
+	.acc(acc),
+	.div(div),
+	.fifo_ext_rd(ofifo_rd)
 );
 
 

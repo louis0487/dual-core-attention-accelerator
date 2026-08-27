@@ -37,7 +37,7 @@ reg reset = 1;
 reg clk = 0;
 reg [pr*bw-1:0] mem_in; 
 reg ofifo_rd = 0;
-wire [16:0] inst; 
+wire [19:0] inst; 
 reg qmem_rd = 0;
 reg qmem_wr = 0; 
 reg kmem_rd = 0; 
@@ -49,7 +49,9 @@ reg load = 0;
 reg [3:0] qkmem_add = 0;
 reg [3:0] pmem_add = 0;
 
-
+assign inst[19] = norm;
+assign inst[18] = div;
+assign inst[17] = acc;
 assign inst[16] = ofifo_rd;
 assign inst[15:12] = qkmem_add;
 assign inst[11:8]  = pmem_add;
