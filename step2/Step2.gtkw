@@ -1,0 +1,46 @@
+[*]
+[*] GTKWave Analyzer v3.3.118 (w)1999-2023 BSI
+[*] Thu Aug 27 09:37:59 2026
+[*]
+[dumpfile] "/home/linux/ieng6/oce/7f/sil123/dual-core-attention-accelerator/step2/fullchip_tb.vcd"
+[dumpfile_mtime] "Thu Aug 27 09:27:17 2026"
+[dumpfile_size] 450624
+[savefile] "/home/linux/ieng6/oce/7f/sil123/dual-core-attention-accelerator/step2/Step2.gtkw"
+[timestart] 0
+[size] 2560 1220
+[pos] -1 -1
+*-13.767429 32490 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] fullchip_tb.
+[treeopen] fullchip_tb.fullchip_instance.
+[treeopen] fullchip_tb.fullchip_instance.core_instance.
+[sst_width] 229
+[signals_width] 186
+[sst_expanded] 1
+[sst_vpaned_height] 355
+@28
+fullchip_tb.clk
+fullchip_tb.reset
+fullchip_tb.fullchip_instance.core_instance.acc
+fullchip_tb.fullchip_instance.core_instance.div
+fullchip_tb.fullchip_instance.core_instance.norm
+@22
+fullchip_tb.fullchip_instance.core_instance.pmem_add[3:0]
+fullchip_tb.fullchip_instance.core_instance.pmem_out[159:0]
+@28
+fullchip_tb.fullchip_instance.core_instance.pmem_rd
+fullchip_tb.fullchip_instance.core_instance.pmem_wr
+@22
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sum_q[23:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sum_2core[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign0[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign1[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign2[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign3[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign4[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign5[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign6[19:0]
+fullchip_tb.fullchip_instance.core_instance.sfp_row_instance.sfp_out_sign7[19:0]
+fullchip_tb.fullchip_instance.core_instance.pmem_in[159:0]
+fullchip_tb.out[159:0]
+[pattern_trace] 1
+[pattern_trace] 0
