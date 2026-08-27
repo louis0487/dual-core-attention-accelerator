@@ -111,7 +111,7 @@ sfp_row #(.col(col), .bw(bw), .bw_psum(bw_psum)) sfp_row_instance (
 	.sfp_out(sfp_out),
 	.acc(acc),
 	.div(div),
-	.fifo_ext_rd(ofifo_rd)
+	.fifo_ext_rd(0)
 );
 
 

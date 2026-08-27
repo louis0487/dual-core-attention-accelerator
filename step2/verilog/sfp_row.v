@@ -112,14 +112,14 @@ module sfp_row (clk, acc, div, fifo_ext_rd, reset, sum_in, sum_out, sfp_in, sfp_
          fifo_wr <= 0;
    
          if (div) begin
-           sfp_out_sign0 <= sfp_in_sign0 / sum_2core;
-           sfp_out_sign1 <= sfp_in_sign1 / sum_2core;
-           sfp_out_sign2 <= sfp_in_sign2 / sum_2core;
-           sfp_out_sign3 <= sfp_in_sign3 / sum_2core;
-           sfp_out_sign4 <= sfp_in_sign4 / sum_2core;
-           sfp_out_sign5 <= sfp_in_sign5 / sum_2core;
-           sfp_out_sign6 <= sfp_in_sign6 / sum_2core;
-           sfp_out_sign7 <= sfp_in_sign7 / sum_2core;
+           sfp_out_sign0 <= abs[bw_psum*1-1 : bw_psum*0] / sum_2core;
+           sfp_out_sign1 <= abs[bw_psum*2-1 : bw_psum*1] / sum_2core;
+           sfp_out_sign2 <= abs[bw_psum*3-1 : bw_psum*2] / sum_2core;
+           sfp_out_sign3 <= abs[bw_psum*4-1 : bw_psum*3] / sum_2core;
+           sfp_out_sign4 <= abs[bw_psum*5-1 : bw_psum*4] / sum_2core;
+           sfp_out_sign5 <= abs[bw_psum*6-1 : bw_psum*5] / sum_2core;
+           sfp_out_sign6 <= abs[bw_psum*7-1 : bw_psum*6] / sum_2core;
+           sfp_out_sign7 <= abs[bw_psum*8-1 : bw_psum*7] / sum_2core;
 
 
 
