@@ -22,6 +22,7 @@ xcelium.d/
 *.cmd
 *.cmd[0-9]*
 inn.cmd.gz
+*.ccopt
 
 # library / foundry file classes (this repo needs none of them)
 *.lib
