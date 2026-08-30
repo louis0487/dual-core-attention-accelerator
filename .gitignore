@@ -16,6 +16,12 @@ xcelium.d/
 *.def
 *.def.gz
 *.v.gz
+*.gds2
+*.logv
+*.history
+*.cmd
+*.cmd[0-9]*
+inn.cmd.gz
 
 # library / foundry file classes (this repo needs none of them)
 *.lib

@@ -50,8 +50,7 @@ analyze -format verilog -lib WORK mac_col.v
 analyze -format verilog -lib WORK mac_8in.v
 analyze -format verilog -lib WORK sfp_row.v
 analyze -format verilog -lib WORK ofifo.v
-analyze -format verilog -lib WORK fifo_depth16.v
-analyze -format verilog -lib WORK fifo_mux_16_1.v
+analyze -format verilog -lib WORK fifo_depth8.v
 analyze -format verilog -lib WORK fifo_mux_8_1.v
 analyze -format verilog -lib WORK fifo_mux_2_1.v
 analyze -format verilog -lib WORK sram_w16.v
