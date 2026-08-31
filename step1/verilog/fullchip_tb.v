@@ -120,17 +120,15 @@ initial begin
   // triplets leave empty. This is the form the course flow uses.
   $sdf_annotate("fullchip_WC.sdf", fullchip_instance, , , "MAXIMUM", "1:1:1", "FROM_MTM");
 
-  // The routed netlist holds 47k instances, so dumping the whole hierarchy
-  // produces a VCD measured in gigabytes. Level 1 keeps the testbench signals
-  // and the chip boundary, which is all the readout check and the report
-  // snapshot need.
+  // Dump the whole hierarchy. Voltus needs activity on the flop outputs and
+  // internal nets to reach 100% annotation when this VCD is fed back into
+  // Innovus for power analysis; the chip boundary alone would leave it
+  // estimating everything past the primary inputs.
   $dumpfile("fullchip_gls.vcd");
-  $dumpvars(1, fullchip_tb);
-  $dumpvars(1, fullchip_instance);
 `else
   $dumpfile("fullchip_tb.vcd");
-  $dumpvars(0, fullchip_tb);
 `endif
+  $dumpvars(0, fullchip_tb);
 
 
 
