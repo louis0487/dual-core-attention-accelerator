@@ -93,7 +93,15 @@ integer pass_cnt;
 
 
 
+// Synthesis resolves the parameters into the netlist, so the mapped fullchip
+// has an empty parameter list. Passing overrides to it is an elaboration
+// error (CUTMIP, "too many module instance parameter assignments"), so the
+// gate-level build instantiates it bare.
+`ifdef GLS
+fullchip fullchip_instance (
+`else
 fullchip #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) fullchip_instance (
+`endif
       .reset(reset),
       .clk(clk), 
       .mem_in(mem_in), 
