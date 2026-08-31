@@ -1,7 +1,7 @@
 # Load design
 set libdir 		$env(COURSE_PDK)
 set design 		"fullchip"
-set netlist 		"./netlist/$design.v"
+set netlist 		"./netlist/$design.out.v"
 set sdc 		"./constraints/$design.sdc"
 set best_timing_lib 	"$libdir/lib/tcbn65gplusbc.lib"
 set worst_timing_lib 	"$libdir/lib/tcbn65gpluswc.lib"

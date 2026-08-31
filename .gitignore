@@ -24,6 +24,29 @@ xcelium.d/
 inn.cmd.gz
 *.ccopt
 
+# Innovus timing analysis output. The .tarpt files carry per-arc delays computed
+# from the foundry timing library, so they belong to the same class as the mapped
+# netlist: numbers go in the README, the reports never do.
+timingReports/
+*.tarpt
+*.tarpt.gz
+*.summary
+*.summary.gz
+*.tran.gz
+*.cap.gz
+*.fanout.gz
+*.length.gz
+
+# other Innovus scratch output
+*.rpt.old
+model.asrt.*
+scheduling_file.cts*
+streamOut.map
+fp_check.txt
+pin_check.txt
+# NOTE: do NOT add bare *.txt here - qdata.txt / kdata.txt / norm*.txt / vdata.txt
+# are the course-supplied input vectors the testbench reads.
+
 # library / foundry file classes (this repo needs none of them)
 *.lib
 *.lef
