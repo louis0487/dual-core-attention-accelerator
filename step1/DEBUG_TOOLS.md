@@ -91,10 +91,19 @@ from the library Verilog at `$COURSE_PDK` (read in place, never copied).
 Check the last line before reading anything else.
 
 Buses are counted in both directions: a bare name counts as driven if any of
-its bits is, and a bit counts as driven if it is, or if something drives the
-whole bus. A bus with one dead bit is still caught, because the load sits on
-that bit. The first version got this wrong in one direction and reported 337
-nets on a design that has far fewer, SRAM outputs included.
+its bits is, a bit counts as driven if it is or if something drives the whole
+bus, and a part-select token like `rd_ptr[3:0]` also accepts per-bit drivers.
+A bus with one dead bit is still caught when the load sits on that bit. The
+first version got the bare-name direction wrong and reported 337 nets, SRAM
+outputs included; the second missed the part-select case and reported every
+hierarchical `.sel(rd_ptr[3:0])`-style connection over a bit-driven bus as
+undriven. Both cases are in the selftest now.
+
+**Remaining blind spot.** A whole-bus load (`.b(key_q)`) over a bus missing
+just one bit driver is NOT caught: the load sits on the bare name, and any
+one bit driver credits it. When a single bit matters, check it by name with
+a scoped scan (see round2.sh's modscan) rather than trusting a clean
+undriven.sh report.
 
 ---
 

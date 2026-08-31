@@ -75,6 +75,17 @@ module busgap ( o, i );
   INVD1BWP G0 ( .I(i), .ZN(w[0]) );
   ND2D1BWP G1 ( .A1(w[0]), .A2(w[1]), .ZN(o) );
 endmodule
+module partsel ( o, i );
+  output o ;
+  input i ;
+  wire [3:0] p ;
+  wire [3:0] dead ;
+  INVD1BWP P0 ( .I(i), .ZN(p[0]) );
+  INVD1BWP P1 ( .I(i), .ZN(p[1]) );
+  INVD1BWP P2 ( .I(i), .ZN(p[2]) );
+  INVD1BWP P3 ( .I(i), .ZN(p[3]) );
+  leaf U9 ( .out(o), .a(p[3:0]), .EXTRA(dead[3:0]) );
+endmodule
 module top ( o, i );
   output o ;
   output deadout ;
@@ -95,6 +106,8 @@ FAKE_EOF
     echo "$out" | grep -q "MYSTERYCELL"             || { echo "FAIL: unknown cell not surfaced"; fail=1; }
     echo "$out" | grep -q "wide"                    && { echo "FAIL: bit-driven bus falsely reported"; fail=1; }
     echo "$out" | grep -q "UNDRIVEN NET  *w\[1\]"   || { echo "FAIL: dead bit of a live bus missed"; fail=1; }
+    echo "$out" | grep -q "p\[3:0\]"                && { echo "FAIL: part-select over a bit-driven bus falsely reported"; fail=1; }
+    echo "$out" | grep -q "UNDRIVEN NET  *dead\[3:0\]" || { echo "FAIL: undriven part-select missed"; fail=1; }
     [ $fail -eq 0 ] && echo "SELFTEST PASS"
     exit $fail
 fi
@@ -186,9 +199,13 @@ phase <= 2 {
     hits = 0
     for (t in seen) {
         # A bare bus name is driven if any of its bits is; a bit is driven if
-        # it is, or if something drives the whole bus.
-        if (t == base(t)) d = drvBus[t]
-        else              d = drv[t] + drv[base(t)]
+        # it is, or if something drives the whole bus. A part-select token like
+        # rd_ptr[3:0] also accepts per-bit drivers - the first version did not,
+        # and reported every hierarchical connection written as a part-select
+        # over a bit-driven bus as undriven.
+        if (t == base(t))                     d = drvBus[t]
+        else if (t ~ /\[[0-9]+:[0-9]+\]$/)    d = drv[t] + drv[base(t)] + drvBus[base(t)]
+        else                                  d = drv[t] + drv[base(t)]
         if (d > 0 || ld[t] == 0) continue
         if (!hits++) printf "=== module %s ===\n", mod
         printf "  %-13s %-34s loads=%d\n", (isout[t] ? "UNDRIVEN OUT" : "UNDRIVEN NET"), t, ld[t]
