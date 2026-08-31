@@ -3,3 +3,8 @@
 # both Windows and the server.
 run_gui  text eol=lf
 *.sh     text eol=lf
+
+# Tcl scripts too. A backslash line continuation followed by CRLF does not
+# continue - Tcl expects the backslash to be immediately before the newline -
+# so a CRLF checkout silently breaks any multi-line command.
+*.tcl    text eol=lf
