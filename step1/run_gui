@@ -6,16 +6,32 @@
 # The cell models are referenced where they live, so no foundry file is ever
 # copied into this tree.
 #
+#   ./run_gui                  batch: everything goes to stdout, so
+#                              ./run_gui 2>&1 | tee gls.log captures the SDF
+#                              statistics and the PASS/FAIL line
+#   GUI=+gui ./run_gui         opens SimVision instead. Note that run-time
+#                              output then goes to the SimVision console, not
+#                              to stdout - a piped log will hold only the
+#                              elaboration messages.
+#
 # The clock runs at 2.0 ns here, not at the 1.0 ns target. Post-route reg2reg
 # WNS is -0.170 ns, so the netlist does not close at 1 GHz, and the testbench
 # gives its inputs only half a period of setup where the SDC assumed 0.8 ns.
 # Tighten it from the command line to find where the netlist stops working:
 #   +define+CLK_HALF=0.7        -> 1.4 ns period
 #
-# Drop +gui to run in batch and read the PASS/FAIL line straight from stdout.
+# SEQ_UDP gives sequential UDPs a floor delay. SDF annotation is never quite
+# complete - the course flow reports around 90% - and whatever it misses is
+# left at zero delay, where a cell can race its own clock and settle to X.
+# Set it if the output comes back X:
+#   SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui
+
+GUI=${GUI:-}
+SEQ_UDP=${SEQ_UDP:-}
 
 xrun \
-+gui \
+$GUI \
+$SEQ_UDP \
 +access+rwc \
 +xm64bit \
 +xmstatus \
@@ -25,8 +41,3 @@ xrun \
 -v ./fullchip.pnr.v \
 -v $COURSE_PDK/verilog/tcbn65gplus.v \
 ./verilog/fullchip_tb.v
-
-# Only for a run without SDF back-annotation: sequential UDPs otherwise have
-# zero delay and race against their own clock. It stays off here because
-# +define+GLS makes the testbench annotate fullchip_WC.sdf.
-# +xmseq_udp_delay+20ps \
