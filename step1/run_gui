@@ -25,9 +25,16 @@
 # left at zero delay, where a cell can race its own clock and settle to X.
 # Set it if the output comes back X:
 #   SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui
+#
+# NO_SDF skips the back-annotation entirely, which splits the problem space in
+# one run: a correct readout without the SDF and X with it means the fault is
+# in the timing; X either way means it is initialisation, or the netlist. Pair
+# it with SEQ_UDP, since an un-annotated netlist has no delays at all:
+#   NO_SDF=1 SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui 2>&1 | tee gls_nosdf.log
 
 GUI=${GUI:-}
 SEQ_UDP=${SEQ_UDP:-}
+if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 
 xrun \
 $GUI \
@@ -38,6 +45,7 @@ $SEQ_UDP \
 +xmtimescale+1ns/1ps \
 +xmoveride_timescale \
 +define+GLS \
+$NO_SDF_DEF \
 -v ./fullchip.pnr.v \
 -v $COURSE_PDK/verilog/tcbn65gplus.v \
 ./verilog/fullchip_tb.v

@@ -118,7 +118,9 @@ initial begin
   // The trailing arguments matter. The SDF carries min::max delay pairs, so
   // without "MAXIMUM" the simulator picks the typical column, which these
   // triplets leave empty. This is the form the course flow uses.
+`ifndef NO_SDF
   $sdf_annotate("fullchip_WC.sdf", fullchip_instance, , , "MAXIMUM", "1:1:1", "FROM_MTM");
+`endif
 
   // Dump the whole hierarchy. Voltus needs activity on the flop outputs and
   // internal nets to reach 100% annotation when this VCD is fed back into
