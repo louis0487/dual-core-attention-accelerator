@@ -38,13 +38,31 @@
 #
 # NO_SDF skips the back-annotation entirely, which splits the problem space in
 # one run: a correct readout without the SDF and X with it means the fault is
-# in the timing; X either way means it is initialisation, or the netlist. Pair
-# it with SEQ_UDP, since an un-annotated netlist has no delays at all:
+# in the timing. X either way narrows it far less than it looks - the two runs
+# still share the testbench, the library and this invocation - so read it as
+# "not timing" and nothing more. Pair it with SEQ_UDP, since an un-annotated
+# netlist has no delays at all:
 #   NO_SDF=1 SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui 2>&1 | tee gls_nosdf.log
+#
+# RTL=1 runs the RTL through this same invocation instead of a netlist, from
+# the course filelist and with no GLS define. The RTL was signed off under a
+# different simulator, so simulator and netlist changed together and neither
+# has been held still. This holds everything but the design description:
+#   RTL=1 ./run_gui 2>&1 | tee rtl_xrun.log
+# Failing here as well puts the fault in the testbench, this script or the
+# simulator, and clears synthesis and place-and-route entirely.
 
 GUI=${GUI:-}
 SEQ_UDP=${SEQ_UDP:-}
 if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
+
+if [ -n "${RTL:-}" ]; then
+    GLS_DEF=
+    SRC="-f ./filelist"
+else
+    GLS_DEF=+define+GLS
+    SRC="-v ${NETLIST:-./fullchip.pnr.v} -v $COURSE_PDK/verilog/tcbn65gplus.v ./verilog/fullchip_tb.v"
+fi
 
 xrun \
 $GUI \
@@ -54,8 +72,6 @@ $SEQ_UDP \
 +xmstatus \
 +xmtimescale+1ns/1ps \
 +xmoveride_timescale \
-+define+GLS \
+$GLS_DEF \
 $NO_SDF_DEF \
--v ${NETLIST:-./fullchip.pnr.v} \
--v $COURSE_PDK/verilog/tcbn65gplus.v \
-./verilog/fullchip_tb.v
+$SRC
