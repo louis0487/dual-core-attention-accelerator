@@ -26,6 +26,16 @@
 # Set it if the output comes back X:
 #   SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui
 #
+# NETLIST picks which netlist to simulate. Post-synthesis simulation is the
+# standard gate between synthesis and place-and-route, and this flow skipped
+# it, so a failure downstream cannot be pinned on either tool. Run the
+# synthesis netlist with no SDF - there is none for it - and with a sequential
+# UDP delay, which a zero-delay netlist needs because data and clock otherwise
+# reach a flop at the same instant and race:
+#   NETLIST=./netlist/fullchip.out.v NO_SDF=1 SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui
+# Failing there too means the netlist left synthesis already broken. Passing
+# there means place-and-route is where it broke.
+#
 # NO_SDF skips the back-annotation entirely, which splits the problem space in
 # one run: a correct readout without the SDF and X with it means the fault is
 # in the timing; X either way means it is initialisation, or the netlist. Pair
@@ -46,6 +56,6 @@ $SEQ_UDP \
 +xmoveride_timescale \
 +define+GLS \
 $NO_SDF_DEF \
--v ./fullchip.pnr.v \
+-v ${NETLIST:-./fullchip.pnr.v} \
 -v $COURSE_PDK/verilog/tcbn65gplus.v \
 ./verilog/fullchip_tb.v
