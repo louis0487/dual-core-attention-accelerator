@@ -3,6 +3,23 @@
 
 `timescale 1ns/1ps
 
+// Clock half period, in the 1 ns units of the timescale above.
+//
+// Behavioural simulation runs at the 1.0 ns target. Gate-level simulation
+// cannot: post-route reg2reg WNS is -0.170 ns, so the routed netlist needs at
+// least 1.170 ns, and this testbench gives its inputs only half a period of
+// setup where the SDC assumed 0.8 ns. 2.0 ns clears both with margin.
+//
+// Override from the command line to tighten it, for example
+//   xrun ... +define+CLK_HALF=0.7      -> 1.4 ns period
+`ifndef CLK_HALF
+  `ifdef GLS
+    `define CLK_HALF 1.0
+  `else
+    `define CLK_HALF 0.5
+  `endif
+`endif
+
 module fullchip_tb;
 
 parameter total_cycle = 8;   // how many streamed Q vectors will be processed
@@ -87,8 +104,22 @@ fullchip #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) fullchip_instance (
 
 initial begin 
 
+`ifdef GLS
+  // Back-annotate the worst-case corner SDF onto the routed netlist. This has
+  // to come first: annotation must land before any timing-dependent activity.
+  $sdf_annotate("fullchip_WC.sdf", fullchip_instance);
+
+  // The routed netlist holds 47k instances, so dumping the whole hierarchy
+  // produces a VCD measured in gigabytes. Level 1 keeps the testbench signals
+  // and the chip boundary, which is all the readout check and the report
+  // snapshot need.
+  $dumpfile("fullchip_gls.vcd");
+  $dumpvars(1, fullchip_tb);
+  $dumpvars(1, fullchip_instance);
+`else
   $dumpfile("fullchip_tb.vcd");
-  $dumpvars(0,fullchip_tb);
+  $dumpvars(0, fullchip_tb);
+`endif
 
 
 
@@ -114,8 +145,8 @@ $display("##### Q data txt reading #####");
 
 
   for (q=0; q<2; q=q+1) begin
-    #0.5 clk = 1'b0;   
-    #0.5 clk = 1'b1;   
+    #`CLK_HALF clk = 1'b0;   
+    #`CLK_HALF clk = 1'b1;   
   end
 
 
@@ -126,8 +157,8 @@ $display("##### Q data txt reading #####");
 $display("##### K data txt reading #####");
 
   for (q=0; q<10; q=q+1) begin
-    #0.5 clk = 1'b0;   
-    #0.5 clk = 1'b1;   
+    #`CLK_HALF clk = 1'b0;   
+    #`CLK_HALF clk = 1'b1;   
   end
   reset = 0;
 
@@ -192,7 +223,7 @@ $display("##### Qmem writing  #####");
 
   for (q=0; q<total_cycle; q=q+1) begin
 
-    #0.5 clk = 1'b0;  
+    #`CLK_HALF clk = 1'b0;  
     qmem_wr = 1;  if (q>0) qkmem_add = qkmem_add + 1; 
     
     mem_in[1*bw-1:0*bw] = Q[q][0];
@@ -204,15 +235,15 @@ $display("##### Qmem writing  #####");
     mem_in[7*bw-1:6*bw] = Q[q][6];
     mem_in[8*bw-1:7*bw] = Q[q][7];
 
-    #0.5 clk = 1'b1;  
+    #`CLK_HALF clk = 1'b1;  
 
   end
 
 
-  #0.5 clk = 1'b0;  
+  #`CLK_HALF clk = 1'b0;  
   qmem_wr = 0; 
   qkmem_add = 0;
-  #0.5 clk = 1'b1;  
+  #`CLK_HALF clk = 1'b1;  
 ///////////////////////////////////////////
 
 
@@ -225,7 +256,7 @@ $display("##### Kmem writing #####");
 
   for (q=0; q<col; q=q+1) begin
 
-    #0.5 clk = 1'b0;  
+    #`CLK_HALF clk = 1'b0;  
     kmem_wr = 1; if (q>0) qkmem_add = qkmem_add + 1; 
     
     mem_in[1*bw-1:0*bw] = K[q][0];
@@ -237,21 +268,21 @@ $display("##### Kmem writing #####");
     mem_in[7*bw-1:6*bw] = K[q][6];
     mem_in[8*bw-1:7*bw] = K[q][7];
 
-    #0.5 clk = 1'b1;  
+    #`CLK_HALF clk = 1'b1;  
 
   end
 
-  #0.5 clk = 1'b0;  
+  #`CLK_HALF clk = 1'b0;  
   kmem_wr = 0;  
   qkmem_add = 0;
-  #0.5 clk = 1'b1;  
+  #`CLK_HALF clk = 1'b1;  
 ///////////////////////////////////////////
 
 
 
   for (q=0; q<2; q=q+1) begin
-    #0.5 clk = 1'b0;  
-    #0.5 clk = 1'b1;   
+    #`CLK_HALF clk = 1'b0;  
+    #`CLK_HALF clk = 1'b1;   
   end
 
 
@@ -261,29 +292,29 @@ $display("##### Kmem writing #####");
 $display("##### K data loading to processor #####");
 
   for (q=0; q<col+1; q=q+1) begin
-    #0.5 clk = 1'b0;  
+    #`CLK_HALF clk = 1'b0;  
     load = 1; 
     if (q==1) kmem_rd = 1;
     if (q>1) begin
        qkmem_add = qkmem_add + 1;
     end
 
-    #0.5 clk = 1'b1;  
+    #`CLK_HALF clk = 1'b1;  
   end
 
-  #0.5 clk = 1'b0;  
+  #`CLK_HALF clk = 1'b0;  
   kmem_rd = 0; qkmem_add = 0;
-  #0.5 clk = 1'b1;  
+  #`CLK_HALF clk = 1'b1;  
 
-  #0.5 clk = 1'b0;  
+  #`CLK_HALF clk = 1'b0;  
   load = 0; 
-  #0.5 clk = 1'b1;  
+  #`CLK_HALF clk = 1'b1;  
 
 ///////////////////////////////////////////
 
  for (q=0; q<10; q=q+1) begin
-    #0.5 clk = 1'b0;   
-    #0.5 clk = 1'b1;   
+    #`CLK_HALF clk = 1'b0;   
+    #`CLK_HALF clk = 1'b1;   
  end
 
 
@@ -294,7 +325,7 @@ $display("##### K data loading to processor #####");
 $display("##### execute #####");
 
   for (q=0; q<total_cycle; q=q+1) begin
-    #0.5 clk = 1'b0;  
+    #`CLK_HALF clk = 1'b0;  
     execute = 1; 
     qmem_rd = 1;
 
@@ -302,19 +333,19 @@ $display("##### execute #####");
        qkmem_add = qkmem_add + 1;
     end
 
-    #0.5 clk = 1'b1;  
+    #`CLK_HALF clk = 1'b1;  
   end
 
-  #0.5 clk = 1'b0;  
+  #`CLK_HALF clk = 1'b0;  
   qmem_rd = 0; qkmem_add = 0; execute = 0;
-  #0.5 clk = 1'b1;  
+  #`CLK_HALF clk = 1'b1;  
 
 
 ///////////////////////////////////////////
 
  for (q=0; q<10; q=q+1) begin
-    #0.5 clk = 1'b0;   
-    #0.5 clk = 1'b1;   
+    #`CLK_HALF clk = 1'b0;   
+    #`CLK_HALF clk = 1'b1;   
  end
 
 
@@ -325,7 +356,7 @@ $display("##### execute #####");
 $display("##### move ofifo to pmem #####");
 
   for (q=0; q<total_cycle; q=q+1) begin
-    #0.5 clk = 1'b0;  
+    #`CLK_HALF clk = 1'b0;  
     ofifo_rd = 1; 
     pmem_wr = 1; 
 
@@ -333,12 +364,12 @@ $display("##### move ofifo to pmem #####");
        pmem_add = pmem_add + 1;
     end
 
-    #0.5 clk = 1'b1;  
+    #`CLK_HALF clk = 1'b1;  
   end
 
-  #0.5 clk = 1'b0;  
+  #`CLK_HALF clk = 1'b0;  
   pmem_wr = 0; pmem_add = 0; ofifo_rd = 0;
-  #0.5 clk = 1'b1;  
+  #`CLK_HALF clk = 1'b1;  
 
 ///////////////////////////////////////////
 
@@ -358,7 +389,7 @@ $display("##### readout from pmem #####");
   // iteration, then issues the next address.
   for (q=0; q<total_cycle+1; q=q+1) begin
 
-    #0.5 clk = 1'b0;  
+    #`CLK_HALF clk = 1'b0;  
 
     if (q>0) begin
       if (out === golden[q-1]) begin
@@ -379,13 +410,13 @@ $display("##### readout from pmem #####");
       pmem_rd = 0; 
     end
 
-    #0.5 clk = 1'b1;  
+    #`CLK_HALF clk = 1'b1;  
 
   end
 
-  #0.5 clk = 1'b0;  
+  #`CLK_HALF clk = 1'b0;  
   pmem_rd = 0; pmem_add = 0;
-  #0.5 clk = 1'b1;  
+  #`CLK_HALF clk = 1'b1;  
 
   $display("##### RESULT: %0d PASS / %0d FAIL #####", pass_cnt, errors);
 
