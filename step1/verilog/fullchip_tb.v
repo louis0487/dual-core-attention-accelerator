@@ -107,7 +107,10 @@ initial begin
 `ifdef GLS
   // Back-annotate the worst-case corner SDF onto the routed netlist. This has
   // to come first: annotation must land before any timing-dependent activity.
-  $sdf_annotate("fullchip_WC.sdf", fullchip_instance);
+  // The trailing arguments matter. The SDF carries min::max delay pairs, so
+  // without "MAXIMUM" the simulator picks the typical column, which these
+  // triplets leave empty. This is the form the course flow uses.
+  $sdf_annotate("fullchip_WC.sdf", fullchip_instance, , , "MAXIMUM", "1:1:1", "FROM_MTM");
 
   // The routed netlist holds 47k instances, so dumping the whole hierarchy
   // produces a VCD measured in gigabytes. Level 1 keeps the testbench signals

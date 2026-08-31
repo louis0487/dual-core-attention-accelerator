@@ -1,0 +1,32 @@
+#!/bin/sh
+# Gate-level simulation of the routed step 1 netlist.
+#
+# Run from step1/, after place-and-route has written fullchip.pnr.v and
+# fullchip_WC.sdf into this directory. COURSE_PDK must point at the PDK root.
+# The cell models are referenced where they live, so no foundry file is ever
+# copied into this tree.
+#
+# The clock runs at 2.0 ns here, not at the 1.0 ns target. Post-route reg2reg
+# WNS is -0.170 ns, so the netlist does not close at 1 GHz, and the testbench
+# gives its inputs only half a period of setup where the SDC assumed 0.8 ns.
+# Tighten it from the command line to find where the netlist stops working:
+#   +define+CLK_HALF=0.7        -> 1.4 ns period
+#
+# Drop +gui to run in batch and read the PASS/FAIL line straight from stdout.
+
+xrun \
++gui \
++access+rwc \
++xm64bit \
++xmstatus \
++xmtimescale+1ns/1ps \
++xmoveride_timescale \
++define+GLS \
+-v ./fullchip.pnr.v \
+-v $COURSE_PDK/verilog/tcbn65gplus.v \
+./verilog/fullchip_tb.v
+
+# Only for a run without SDF back-annotation: sequential UDPs otherwise have
+# zero delay and race against their own clock. It stays off here because
+# +define+GLS makes the testbench annotate fullchip_WC.sdf.
+# +xmseq_udp_delay+20ps \
