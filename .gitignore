@@ -81,3 +81,8 @@ log/
 *.swo
 .*.swo
 *~
+
+# debug scratch from the gate-level sim investigation (derived from the mapped netlist)
+undriven_dc.txt
+undriven_pnr.txt
+undriven.log

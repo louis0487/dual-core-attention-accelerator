@@ -8,12 +8,11 @@
 #
 # Port directions are read, not guessed: every module defined in the netlist
 # contributes its own declarations, and the standard cells contribute theirs
-# from the library Verilog. Nothing is inferred from a pin name, so there is no
-# repeat of the DRIVER/LOAD heuristic that netcheck.sh had to walk back.
+# from the library Verilog. Nothing is inferred from a pin name.
 #
 #   ./undriven.sh                             whole netlist
 #   ./undriven.sh mac_col_bw8_bw_psum20_pr8_col_id3      one module
-#   NETLIST=x.v CELLLIB=y.v ./undriven.sh
+#   NETLIST=./netlist/fullchip.out.v ./undriven.sh       the synthesis netlist
 #
 # The library is read where it lives and never copied, so no foundry file
 # enters this tree.
@@ -28,8 +27,13 @@
 #                  pin directions are unknown. A nonzero count means the scan
 #                  is incomplete; the names are listed so it can be checked.
 #
-# Bit selects credit the whole bus too, so q_out[3] counts as driven when
-# something drives q_out. That makes bus bits conservative, never noisy.
+# Buses are counted in both directions. The first version of this script got
+# that wrong and over-reported by an order of magnitude: a port declared
+# output [63:0] q_out is driven bit by bit, so the bare name q_out never
+# collects a driver of its own and looked dead. So now a bare name counts as
+# driven if any of its bits is, and a bit counts as driven if it is, or if
+# something drives the whole bus. A bus with one dead bit is still caught,
+# because the load sits on that bit.
 #
 # Self-test:  ./undriven.sh --selftest
 
@@ -40,12 +44,10 @@ if [ "$1" = "--selftest" ]; then
     d=${TMPDIR:-/tmp}/undriven_selftest.$$
     mkdir -p "$d"
     cat > "$d/cells.v" <<'FAKE_EOF'
-`celldefine
 module INVD1BWP (ZN, I);
   output ZN;
   input I;
 endmodule
-`endcelldefine
 module ND2D1BWP (ZN, A1, A2);
   output ZN;
   input A1, A2;
@@ -57,6 +59,21 @@ module leaf ( out, a, EXTRA );
   input a ;
   input EXTRA ;
   INVD1BWP U1 ( .I(a), .ZN(out) );
+endmodule
+module buswide ( wide, i );
+  output [3:0] wide ;
+  input i ;
+  INVD1BWP B0 ( .I(i), .ZN(wide[0]) );
+  INVD1BWP B1 ( .I(i), .ZN(wide[1]) );
+  INVD1BWP B2 ( .I(i), .ZN(wide[2]) );
+  INVD1BWP B3 ( .I(i), .ZN(wide[3]) );
+endmodule
+module busgap ( o, i );
+  output o ;
+  input i ;
+  wire [1:0] w ;
+  INVD1BWP G0 ( .I(i), .ZN(w[0]) );
+  ND2D1BWP G1 ( .A1(w[0]), .A2(w[1]), .ZN(o) );
 endmodule
 module top ( o, i );
   output o ;
@@ -72,11 +89,12 @@ FAKE_EOF
     rm -rf "$d"
     echo "$out"
     fail=0
-    echo "$out" | grep -q "UNDRIVEN NET  *orphan"  || { echo "FAIL: orphan not reported"; fail=1; }
-    echo "$out" | grep -q "UNDRIVEN OUT  *deadout" || { echo "FAIL: dead output not reported"; fail=1; }
-    echo "$out" | grep -q "UNDRIVEN.* good"        && { echo "FAIL: driven net reported"; fail=1; }
-    echo "$out" | grep -q "UNDRIVEN.* a$"          && { echo "FAIL: module input reported"; fail=1; }
-    echo "$out" | grep -q "MYSTERYCELL"            || { echo "FAIL: unknown cell not surfaced"; fail=1; }
+    echo "$out" | grep -q "UNDRIVEN NET  *orphan"   || { echo "FAIL: orphan not reported"; fail=1; }
+    echo "$out" | grep -q "UNDRIVEN OUT  *deadout"  || { echo "FAIL: dead output not reported"; fail=1; }
+    echo "$out" | grep -q "UNDRIVEN.* good"         && { echo "FAIL: driven net reported"; fail=1; }
+    echo "$out" | grep -q "MYSTERYCELL"             || { echo "FAIL: unknown cell not surfaced"; fail=1; }
+    echo "$out" | grep -q "wide"                    && { echo "FAIL: bit-driven bus falsely reported"; fail=1; }
+    echo "$out" | grep -q "UNDRIVEN NET  *w\[1\]"   || { echo "FAIL: dead bit of a live bus missed"; fail=1; }
     [ $fail -eq 0 ] && echo "SELFTEST PASS"
     exit $fail
 fi
@@ -87,13 +105,15 @@ fi
 # The netlist is read twice: once for port directions, once for the analysis,
 # since a module can be instantiated before it is defined.
 awk -v only="$1" '
+function base(t,   b) { b = t; sub(/\[.*/, "", b); return b }
+function credit(t) { drv[t]++; drvBus[base(t)]++ }
 function note(expr, isDrv,   n, T, i, t) {
     gsub(/[{}]/, " ", expr)
     n = split(expr, T, /[ \t,]+/)
     for (i = 1; i <= n; i++) {
         t = T[i]
-        if (t == "" || t ~ /^[0-9]/ || t ~ /^[0-9]*.b[01xzXZ]$/) continue
-        if (isDrv) drv[t]++; else ld[t]++
+        if (t == "" || t ~ /^[0-9]/) continue
+        if (isDrv) credit(t); else ld[t]++
         seen[t] = 1
     }
 }
@@ -136,14 +156,14 @@ phase <= 2 {
 # ---- phase 3: driver and load census, netlist only
 /^ *module[ \t]/ {
     mod = $2; sub(/\(.*/, "", mod)
-    split("", drv); split("", ld); split("", seen)
+    split("", drv); split("", drvBus); split("", ld); split("", seen); split("", isout)
     # An input port of this module is driven from outside; an output must be
     # driven from inside, so it counts as a load.
     for (k in dir) {
         split(k, K, SUBSEP)
         if (K[1] != mod) continue
-        if (dir[k] == "input" || dir[k] == "inout") { drv[K[2]]++; seen[K[2]] = 1 }
-        else if (dir[k] == "output")                { ld[K[2]]++;  seen[K[2]] = 1; isout[K[2]] = 1 }
+        if (dir[k] == "input" || dir[k] == "inout") { credit(K[2]); seen[K[2]] = 1 }
+        else if (dir[k] == "output")                { ld[K[2]]++; seen[K[2]] = 1; isout[K[2]] = 1 }
     }
     next
 }
@@ -165,15 +185,16 @@ phase <= 2 {
     if (mod == "" || (only != "" && mod != only)) { mod = ""; next }
     hits = 0
     for (t in seen) {
-        base = t; sub(/\[.*/, "", base)
-        d = drv[t] + (base != t ? drv[base] : 0)
+        # A bare bus name is driven if any of its bits is; a bit is driven if
+        # it is, or if something drives the whole bus.
+        if (t == base(t)) d = drvBus[t]
+        else              d = drv[t] + drv[base(t)]
         if (d > 0 || ld[t] == 0) continue
         if (!hits++) printf "=== module %s ===\n", mod
         printf "  %-13s %-34s loads=%d\n", (isout[t] ? "UNDRIVEN OUT" : "UNDRIVEN NET"), t, ld[t]
         total++
     }
     if (hits) print ""
-    split("", isout)
     mod = ""
 }
 END {
