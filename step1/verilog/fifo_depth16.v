@@ -1,6 +1,7 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
 module fifo_depth16 (rd_clk, wr_clk, in, out, rd, wr, o_full, o_empty, reset);
+//synopsys sync_set_reset "reset"
 
   parameter bw = 4;
   parameter simd = 1;

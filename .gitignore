@@ -16,6 +16,36 @@ xcelium.d/
 *.def
 *.def.gz
 *.v.gz
+*.gds2
+*.logv
+*.history
+*.cmd
+*.cmd[0-9]*
+inn.cmd.gz
+*.ccopt
+
+# Innovus timing analysis output. The .tarpt files carry per-arc delays computed
+# from the foundry timing library, so they belong to the same class as the mapped
+# netlist: numbers go in the README, the reports never do.
+timingReports/
+*.tarpt
+*.tarpt.gz
+*.summary
+*.summary.gz
+*.tran.gz
+*.cap.gz
+*.fanout.gz
+*.length.gz
+
+# other Innovus scratch output
+*.rpt.old
+model.asrt.*
+scheduling_file.cts*
+streamOut.map
+fp_check.txt
+pin_check.txt
+# NOTE: do NOT add bare *.txt here - qdata.txt / kdata.txt / norm*.txt / vdata.txt
+# are the course-supplied input vectors the testbench reads.
 
 # library / foundry file classes (this repo needs none of them)
 *.lib
@@ -51,3 +81,16 @@ log/
 *.swo
 .*.swo
 *~
+
+# debug scratch from the gate-level sim investigation (derived from the mapped netlist)
+undriven_dc.txt
+undriven_pnr.txt
+undriven.log
+
+# numbered tool logs and compiled SDF - the bare patterns above miss these
+# (innovus.log1, innovus.logv2, fullchip_WC.sdf.X all slipped through once)
+innovus.log*
+innovus.logv*
+*.sdf.X
+.simvision/
+xrun.key

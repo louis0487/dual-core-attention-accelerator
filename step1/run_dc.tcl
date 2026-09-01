@@ -64,7 +64,7 @@ current_design $top_module
 link
 
 # Default SDC Constraints
-read_sdc ${top_module}.sdc
+read_sdc ./constraints/${top_module}.sdc
 propagate_constraints
 
 current_design $top_module
