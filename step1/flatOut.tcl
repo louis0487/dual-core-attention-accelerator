@@ -28,11 +28,19 @@ if {![info exists design]} { set design fullchip }
 # Announce immediately: a silent source means the wrong file was read, and
 # one round was already lost to exactly that.
 puts "flatOut: starting on design ${design}"
-catch { puts "flatOut: hierarchical instances before = [llength [dbGet -e top.hInsts.name]]" }
+puts "flatOut: hierarchical instances before = [llength [dbGet -e top.hInsts.name]]"
 
-ungroup * -flatten
+# The wildcard form "ungroup * -flatten" is a silent no-op in this console -
+# the star gets filename-style expansion and matches no hinst. Name the one
+# top-level hierarchical instance explicitly; -flatten recurses below it.
+ungroup core_instance -flatten
 
-catch { puts "flatOut: hierarchical instances after  = [llength [dbGet -e top.hInsts.name]]" }
+set nh [llength [dbGet -e top.hInsts.name]]
+puts "flatOut: hierarchical instances after  = $nh"
+if { $nh != 0 } {
+    puts "flatOut: ERROR - hierarchy is not flat, stopping before any file is written"
+    return
+}
 
 saveNetlist ${design}.pnr.v
 
