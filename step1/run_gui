@@ -71,6 +71,17 @@ if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 # DC map the rest the same way via the sync_set_reset directive.
 if [ -n "${INIT0:-}" ]; then INIT_OPT="-initreg0 -initmem0"; else INIT_OPT=; fi
 
+# CLK_HALF=<ns> overrides the clock half period. The default GLS value of 1.0
+# equals the testbench input-change offset, and the CTS insertion delay spans
+# 0.794 to 1.118 ns: flops whose clock arrives later than the input change
+# capture the next cycle's value one cycle early, which showed up as several
+# fifo columns reading one row behind - byte-identical across three different
+# SDFs, because the effect quantizes to whole cycles. Slowing the simulation
+# clock past the insertion delay is the standard remedy and claims nothing
+# about design speed; the frequency claim rests on STA.
+#   CLK_HALF=2.0 ./run_gui
+if [ -n "${CLK_HALF:-}" ]; then CLK_DEF=+define+CLK_HALF=$CLK_HALF; else CLK_DEF=; fi
+
 if [ -n "${RTL:-}" ]; then
     GLS_DEF=
     SRC="-f ./filelist"
@@ -82,6 +93,6 @@ fi
 # The invocation is echoed because xrun does not put its own argv in the
 # output: a log that lacks this line proves nothing about which flags ran,
 # and one debugging round was lost to exactly that misreading.
-ARGS="$GUI $SEQ_UDP $INIT_OPT +access+rwc +xm64bit +xmstatus +xmtimescale+1ns/1ps +xmoveride_timescale $GLS_DEF $NO_SDF_DEF $SRC"
+ARGS="$GUI $SEQ_UDP $INIT_OPT $CLK_DEF +access+rwc +xm64bit +xmstatus +xmtimescale+1ns/1ps +xmoveride_timescale $GLS_DEF $NO_SDF_DEF $SRC"
 echo "run_gui invoking: xrun $ARGS"
 xrun $ARGS
