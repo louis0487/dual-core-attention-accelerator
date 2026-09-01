@@ -1,6 +1,7 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
 module mac_col (clk, reset, out, q_in, q_out, i_inst, fifo_wr, o_inst);
+// synopsys sync_set_reset "reset"
 
 parameter bw = 8;
 parameter bw_psum = 2*bw+6;

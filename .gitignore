@@ -86,3 +86,11 @@ log/
 undriven_dc.txt
 undriven_pnr.txt
 undriven.log
+
+# numbered tool logs and compiled SDF - the bare patterns above miss these
+# (innovus.log1, innovus.logv2, fullchip_WC.sdf.X all slipped through once)
+innovus.log*
+innovus.logv*
+*.sdf.X
+.simvision/
+xrun.key
