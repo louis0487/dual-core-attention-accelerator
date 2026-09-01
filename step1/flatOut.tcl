@@ -25,7 +25,14 @@
 
 if {![info exists design]} { set design fullchip }
 
+# Announce immediately: a silent source means the wrong file was read, and
+# one round was already lost to exactly that.
+puts "flatOut: starting on design ${design}"
+catch { puts "flatOut: hierarchical instances before = [llength [dbGet -e top.hInsts.name]]" }
+
 ungroup * -flatten
+
+catch { puts "flatOut: hierarchical instances after  = [llength [dbGet -e top.hInsts.name]]" }
 
 saveNetlist ${design}.pnr.v
 
