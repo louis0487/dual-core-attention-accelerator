@@ -64,14 +64,9 @@ else
     SRC="-v ${NETLIST:-./fullchip.pnr.v} -v $COURSE_PDK/verilog/tcbn65gplus.v ./verilog/fullchip_tb.v"
 fi
 
-xrun \
-$GUI \
-$SEQ_UDP \
-+access+rwc \
-+xm64bit \
-+xmstatus \
-+xmtimescale+1ns/1ps \
-+xmoveride_timescale \
-$GLS_DEF \
-$NO_SDF_DEF \
-$SRC
+# The invocation is echoed because xrun does not put its own argv in the
+# output: a log that lacks this line proves nothing about which flags ran,
+# and one debugging round was lost to exactly that misreading.
+ARGS="$GUI $SEQ_UDP +access+rwc +xm64bit +xmstatus +xmtimescale+1ns/1ps +xmoveride_timescale $GLS_DEF $NO_SDF_DEF $SRC"
+echo "run_gui invoking: xrun $ARGS"
+xrun $ARGS

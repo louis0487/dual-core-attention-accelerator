@@ -1,14 +1,14 @@
 #!/bin/sh
 # postsyn.sh - post-synthesis gate-level simulation, done right.
 #
-# The first attempt at this run was typed by hand and lost the sequential UDP
-# delay flag on the way: gls_postsyn.log contains no xmseq_udp_delay, so that
-# run measured the zero-delay race - data and clock reaching every flop in
-# the same instant - which turns ANY netlist to X, broken or perfect. Its
-# 0/8 result says nothing and retired the wrong suspect.
+# The first attempt at this run was typed by hand, and its log could not show
+# whether the sequential UDP delay flag was present, because xrun does not put
+# its argv in the output. A stub-xrun test then proved the wrapper delivers
+# the flag, and run_gui now echoes its full invocation, so the log check
+# below is meaningful from here on.
 #
-# This wraps the documented invocation so no flag can go missing again, and
-# verifies afterwards that the flag actually reached the simulator.
+# This wraps the documented invocation so no flag can go missing, and
+# verifies afterwards that the invocation line in the log carries it.
 #
 #   ./postsyn.sh          runs, logs to gls_postsyn.log, checks itself
 #
