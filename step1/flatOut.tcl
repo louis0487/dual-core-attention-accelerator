@@ -17,6 +17,14 @@
 # flat .enc also serves the later VCD-to-Voltus power measurement, whose
 # instance names must match the simulated netlist.
 #
+# write_sdf uses -recompute_delay_calc: without it the tool merges multiple
+# timing arcs between a pin pair into one delay entry (its own SDF-808
+# warning says so and recommends this option for functional simulation), the
+# merged entries do not match the conditional specify paths of the XOR and
+# adder cells, annotation drops them to zero delay (the SDFNEP flood), and
+# the SDF-annotated simulation misreads several fifo columns by one row
+# while the same netlist with no SDF passes 8/8.
+#
 # Run inside Innovus, on the restored routed design:
 #   restoreDesign route.enc.dat fullchip
 #   source flatOut.tcl
@@ -46,11 +54,11 @@ saveNetlist ${design}.pnr.v
 
 setAnalysisMode -setup
 set_analysis_view -setup WC_VIEW -hold WC_VIEW
-write_sdf -view WC_VIEW ${design}_WC.sdf
+write_sdf -recompute_delay_calc -view WC_VIEW ${design}_WC.sdf
 
 setAnalysisMode -hold
 set_analysis_view -setup BC_VIEW -hold BC_VIEW
-write_sdf -view BC_VIEW ${design}_BC.sdf
+write_sdf -recompute_delay_calc -view BC_VIEW ${design}_BC.sdf
 
 saveDesign route_flat.enc
 
