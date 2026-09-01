@@ -56,15 +56,19 @@ GUI=${GUI:-}
 SEQ_UDP=${SEQ_UDP:-}
 if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 
-# INIT0=1 starts every register and memory at zero instead of X. Real silicon
-# powers up in a two-state world, and the synthesized reset logic is two-state
-# equivalent to the RTL but not X-safe: in five of the eight mac_col variants
-# DC factored the synchronous reset through shared product terms, so an X
-# power-up state gates the reset off and the counter locks at X forever. That
-# is a simulation artifact, not a design bug - the cones were traced and the
-# working and broken variants differ only in reset dominance. Zero-init makes
-# the simulation match silicon. It also masks genuinely missing resets, so it
-# stays an explicit switch rather than a default.
+# INIT0=1 zero-initializes variables and memories. MEASURED INEFFECTIVE for
+# this netlist: the flop state lives in the 26k UDP primitives, which
+# -initreg0/-initmem0 do not touch, so the X power-up state survives and the
+# X-locked reset cones (see below) never clear. Kept because it documents the
+# attempt and still applies to variable-based models.
+#
+# The underlying disease: DC factored the synchronous reset of five mac_col
+# variants (and parts of fifo_depth16) through shared product terms. That is
+# two-state equivalent to the RTL - silicon resets fine - but under a
+# four-state simulator an X power-up value gates the reset off and the
+# register locks at X forever. Registers that were mapped to sync-clear-pin
+# flops (DFKCNQ*, e.g. inst_q) exit X cleanly everywhere; the fix is to make
+# DC map the rest the same way via the sync_set_reset directive.
 if [ -n "${INIT0:-}" ]; then INIT_OPT="-initreg0 -initmem0"; else INIT_OPT=; fi
 
 if [ -n "${RTL:-}" ]; then
