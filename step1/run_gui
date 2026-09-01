@@ -56,6 +56,17 @@ GUI=${GUI:-}
 SEQ_UDP=${SEQ_UDP:-}
 if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 
+# INIT0=1 starts every register and memory at zero instead of X. Real silicon
+# powers up in a two-state world, and the synthesized reset logic is two-state
+# equivalent to the RTL but not X-safe: in five of the eight mac_col variants
+# DC factored the synchronous reset through shared product terms, so an X
+# power-up state gates the reset off and the counter locks at X forever. That
+# is a simulation artifact, not a design bug - the cones were traced and the
+# working and broken variants differ only in reset dominance. Zero-init makes
+# the simulation match silicon. It also masks genuinely missing resets, so it
+# stays an explicit switch rather than a default.
+if [ -n "${INIT0:-}" ]; then INIT_OPT="-initreg0 -initmem0"; else INIT_OPT=; fi
+
 if [ -n "${RTL:-}" ]; then
     GLS_DEF=
     SRC="-f ./filelist"
@@ -67,6 +78,6 @@ fi
 # The invocation is echoed because xrun does not put its own argv in the
 # output: a log that lacks this line proves nothing about which flags ran,
 # and one debugging round was lost to exactly that misreading.
-ARGS="$GUI $SEQ_UDP +access+rwc +xm64bit +xmstatus +xmtimescale+1ns/1ps +xmoveride_timescale $GLS_DEF $NO_SDF_DEF $SRC"
+ARGS="$GUI $SEQ_UDP $INIT_OPT +access+rwc +xm64bit +xmstatus +xmtimescale+1ns/1ps +xmoveride_timescale $GLS_DEF $NO_SDF_DEF $SRC"
 echo "run_gui invoking: xrun $ARGS"
 xrun $ARGS
