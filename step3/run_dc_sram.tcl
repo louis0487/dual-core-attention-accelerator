@@ -1,4 +1,4 @@
-set width 64
+set width 160
 set top_module sram_w16
 set design ${top_module}_sram_bit${width}
 set rtlPath "./verilog"
