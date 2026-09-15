@@ -5,7 +5,7 @@
 #
 # Run it on the routed database:
 #   innovus
-#   restoreDesign route.enc.dat fullchip
+#   restoreDesign <design>_route.enc.dat <design>
 #   source checkNetlist.tcl
 #
 # checkDesign options, from the Innovus Text Command Reference 19.11:

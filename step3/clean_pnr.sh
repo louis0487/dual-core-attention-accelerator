@@ -20,20 +20,21 @@
 # produce new numbers, and those records need re-measuring - the archive keeps
 # the old reports so the two runs can be compared honestly.
 
+design=${DESIGN:-fullchip}
 arch=pre_syncreset_run
 mkdir -p "$arch"
 
 echo "archiving text reports to $arch/ ..."
-for p in timingReports fullchip.*.rpt *.summary fullchip.conn.rpt.old fullchip.drc.rpt.old fullchip.geom.rpt.old; do
+for p in timingReports $design.*.rpt *.summary $design.conn.rpt.old $design.drc.rpt.old $design.geom.rpt.old; do
     [ -e "$p" ] && mv -v "$p" "$arch/" 2>/dev/null
 done
 
 echo
 echo "deleting stale binaries and databases ..."
-for p in *.enc *.enc.dat fullchip.pnr.v fullchip_WC.sdf fullchip_BC.sdf \
-         fullchip_WC.lib fullchip_BC.lib fullchip.gds2 fullchip.def fullchip.def.gz \
+for p in $design*.enc $design*.enc.dat $design.pnr.v ${design}_WC.sdf ${design}_BC.sdf \
+         ${design}_WC.lib ${design}_BC.lib $design.gds2 $design.def $design.def.gz \
          streamOut.map scheduling_file.cts* model.asrt* fp_check.txt pin_check.txt \
-         xcelium.d fullchip_gls.vcd fullchip_tb.vcd innovus.log* innovus.cmd* \
+         xcelium.d ${design}_gls.vcd ${design}_tb.vcd innovus.log* innovus.cmd* \
          inn.cmd* *.logv; do
     [ -e "$p" ] && rm -rf "$p" && echo "  removed $p"
 done

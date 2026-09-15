@@ -12,8 +12,9 @@
 # instances the netlist does.
 #
 # Physical results are untouched: GDS, DEF and LEF from the hierarchical run
-# stay valid, and this session is saved separately as route_flat.enc - do NOT
-# overwrite route.enc, the hierarchical database remains the reference. The
+# stay valid, and this session is saved separately as ${design}_route_flat.enc - do
+# NOT overwrite ${design}_route.enc, the hierarchical database remains the
+# reference. The
 # flat .enc also serves the later VCD-to-Voltus power measurement, whose
 # instance names must match the simulated netlist.
 #
@@ -26,7 +27,7 @@
 # while the same netlist with no SDF passes 8/8.
 #
 # Run inside Innovus, on the restored routed design:
-#   restoreDesign route.enc.dat fullchip
+#   restoreDesign <design>_route.enc.dat <design>
 #   source flatOut.tcl
 # Then outside:  ./cmpnl.sh   (routed UNDRIVEN NET must drop to 0;
 #                              module count dropping to 1 is expected)
@@ -60,6 +61,6 @@ setAnalysisMode -hold
 set_analysis_view -setup BC_VIEW -hold BC_VIEW
 write_sdf -recompute_delay_calc -view BC_VIEW ${design}_BC.sdf
 
-saveDesign route_flat.enc
+saveDesign ${design}_route_flat.enc
 
-puts "RECORD flatOut: netlist, WC/BC sdf and route_flat.enc written from the flattened database"
+puts "RECORD flatOut: netlist, WC/BC sdf and ${design}_route_flat.enc written from the flattened database"

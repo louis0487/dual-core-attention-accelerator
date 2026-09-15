@@ -8,9 +8,9 @@
 
 # ---- timing: WNS, TNS and violating path count, setup and hold ----
 # Reports land in ./timingReports/ :
-#   fullchip_postRoute.summary        setup WNS / TNS / violating paths
-#   fullchip_postRoute_hold.summary   the same for hold
-#   fullchip_postRoute_*.tarpt        per path group detail
+#   <design>_postRoute.summary        setup WNS / TNS / violating paths
+#   <design>_postRoute_hold.summary   the same for hold
+#   <design>_postRoute_*.tarpt        per path group detail
 # timeDesign also reports Density, which is one source for utilization.
 timeDesign -postRoute -prefix postRoute
 timeDesign -postRoute -hold -prefix postRoute

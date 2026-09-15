@@ -17,4 +17,4 @@ extractRC
 # Post-route timing optimization
 setAnalysisMode -analysisType onChipVariation -cppr both
 optDesign -postRoute -setup -hold
-saveDesign route.enc
+saveDesign ${design}_route.enc

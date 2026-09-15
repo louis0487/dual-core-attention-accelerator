@@ -23,6 +23,6 @@ sroute
 
 setMaxRouteLayer 6
 
-saveDesign initial.enc
+saveDesign ${design}_initial.enc
 
 timeDesign -preplace -prefix preplace

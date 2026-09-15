@@ -18,10 +18,12 @@
 #   ./cmpnl.sh
 #   DC_NETLIST=x.v PNR_NETLIST=y.v ./cmpnl.sh
 #
-# Run it from step1/, after synthesis and after place-and-route.
+# Run it from step3/, after synthesis and after place-and-route. DESIGN picks
+# which design to check; it defaults to fullchip so step1 usage is unchanged.
 
-dc=${DC_NETLIST:-./netlist/fullchip.out.v}
-pnr=${PNR_NETLIST:-fullchip.pnr.v}
+design=${DESIGN:-fullchip}
+dc=${DC_NETLIST:-./netlist/$design.out.v}
+pnr=${PNR_NETLIST:-$design.pnr.v}
 here=$(dirname "$0")
 
 for f in "$dc" "$pnr"; do
@@ -35,11 +37,11 @@ echo "synthesis netlist : $dc"
 ls -l --time-style=+%Y-%m-%d\ %H:%M "$dc"  2>/dev/null | awk '{print "  written        :", $6, $7}'
 echo "routed netlist    : $pnr"
 ls -l --time-style=+%Y-%m-%d\ %H:%M "$pnr" 2>/dev/null | awk '{print "  written        :", $6, $7}'
-if [ -r ./fullchip.out.v ]; then
-    if cmp -s ./fullchip.out.v "$dc"; then
-        echo "  netlist/ copy matches ./fullchip.out.v"
+if [ -r "./$design.out.v" ]; then
+    if cmp -s "./$design.out.v" "$dc"; then
+        echo "  netlist/ copy matches ./$design.out.v"
     else
-        echo "  WARNING: ./fullchip.out.v differs from $dc - the copy into netlist/ is stale"
+        echo "  WARNING: ./$design.out.v differs from $dc - the copy into netlist/ is stale"
     fi
 fi
 echo
