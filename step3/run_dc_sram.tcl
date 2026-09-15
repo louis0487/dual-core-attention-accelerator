@@ -1,5 +1,6 @@
+set width 64
 set top_module sram_w16
-set sram sram64
+set design ${top_module}_sram_bit${width}
 set rtlPath "./verilog"
 
 # Target library
@@ -46,17 +47,17 @@ set verilogout_single_bit false
 # read RTL
 analyze -format verilog -lib WORK sram_w16.v
 
-elaborate $sram -lib WORK -update
-current_design $sram
+elaborate $top_module -parameters "sram_bit=$width" -lib WORK -update
+current_design $design
 
 # Link Design
 link
 
 # Default SDC Constraints
-read_sdc ${sram}.sdc
+read_sdc sram${width}.sdc
 propagate_constraints
 
-current_design $sram
+current_design $design
 
 set_cost_priority {max_transition max_fanout max_delay max_capacitance}
 set_fix_multiple_port_nets -all -buffer_constants
@@ -80,33 +81,33 @@ foreach_in_collection design [ get_designs "*" ] {
 	#feedthrough / outputs / constants
 	set_fix_multiple_port_nets -all
 }
-current_design $sram
+current_design $design
 # Compile
 # Source user compile options
 compile_ultra -no_autoungroup -timing_high_effort_script -exact_map
 
 # Write Out Design - Hierarchical
-current_design $sram
+current_design $design
 
 change_names -rules verilog -hierarchy
 
-write -format verilog -hier -output [format "%s%s" $sram .out.v]
+write -format verilog -hier -output [format "%s%s" $design .out.v]
 
 # Write Reports
-redirect [format "%s%s" log/ $sram _area.rep] { report_area }
-redirect -append [format "%s%s%s" log/ $sram _area.rep] { report_reference }
-redirect [format "%s%s%s" log/ $sram _power.rep] { report_power }
-redirect [format "%s%s%s" log/ $sram _timing.rep] \
+redirect [format "%s%s" log/ $design _area.rep] { report_area }
+redirect -append [format "%s%s%s" log/ $design _area.rep] { report_reference }
+redirect [format "%s%s%s" log/ $design _power.rep] { report_power }
+redirect [format "%s%s%s" log/ $design _timing.rep] \
   { report_timing -path full -max_paths 100 -nets -transition_time -capacitance -significant_digits 3 -nosplit}
 
-set inFile  [open log/$sram\_area.rep]
+set inFile  [open log/$design\_area.rep]
 while { [gets $inFile line]>=0 } {
     if { [regexp {Total cell area:} $line] } {
         set AREA [lindex $line 3]
     }
 }
 close $inFile
-set inFile  [open log/$sram\_power.rep]
+set inFile  [open log/$design\_power.rep]
 while { [gets $inFile line]>=0 } {
     if { [regexp {Total Dynamic Power} $line] } {
         set PWR [lindex $line 4]
@@ -116,7 +117,7 @@ while { [gets $inFile line]>=0 } {
 }
 close $inFile
 
-set unmapped_designs [get_designs -filter "is_unmapped == true" $sram]
+set unmapped_designs [get_designs -filter "is_unmapped == true" $design]
 if {  [sizeof_collection $unmapped_designs] != 0 } {
 	echo "****************************************************"
 	echo "* ERROR!!!! Compile finished with unmapped logic.  *"
