@@ -72,12 +72,12 @@ foreach_in_collection p [all_outputs] {
 #More compiler directives
 set compile_effort   "high"
 set_app_var ungroup_keep_original_design true
-set_register_merging [get_designs $top_module] false
+set_register_merging [get_designs $design] false
 set compile_seqmap_propagate_constants false
 set compile_seqmap_propagate_high_effort false
 # More constraints and setup before compile
-foreach_in_collection design [ get_designs "*" ] {
-	current_design $design
+foreach_in_collection d [ get_designs "*" ] {
+	current_design $d
 	#feedthrough / outputs / constants
 	set_fix_multiple_port_nets -all
 }
@@ -94,7 +94,7 @@ change_names -rules verilog -hierarchy
 write -format verilog -hier -output [format "%s%s" $design .out.v]
 
 # Write Reports
-redirect [format "%s%s" log/ $design _area.rep] { report_area }
+redirect [format "%s%s%s" log/ $design _area.rep] { report_area }
 redirect -append [format "%s%s%s" log/ $design _area.rep] { report_reference }
 redirect [format "%s%s%s" log/ $design _power.rep] { report_power }
 redirect [format "%s%s%s" log/ $design _timing.rep] \
