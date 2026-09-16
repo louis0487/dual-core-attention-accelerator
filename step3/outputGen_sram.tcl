@@ -1,5 +1,5 @@
 streamOut ${design}.gds2
-write_lef_abstract ${design}.lef
+write_lef_abstract ${design}.lef -specifyTopLayer 4
 defOut -netlist -routing ${design}.def
 saveNetlist ${design}.pnr.v
 

@@ -1,5 +1,5 @@
 # Load design
-set width               "64"
+set width               "160"
 set libdir 		$env(COURSE_PDK)
 set design 		"sram_w16_sram_bit$width"
 set netlist 		"./netlist/$design.out.v"
