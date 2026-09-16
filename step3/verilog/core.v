@@ -75,7 +75,7 @@ ofifo #(.bw(bw_psum), .col(col))  ofifo_inst (
 );
 
 
-sram_w16 #(.sram_bit(pr*bw)) qmem_instance (
+sram_w16_sram_bit64 qmem_instance (
         .CLK(clk),
         .D(mem_in),
         .Q(qmem_out),
@@ -84,7 +84,7 @@ sram_w16 #(.sram_bit(pr*bw)) qmem_instance (
         .A(qkmem_add)
 );
 
-sram_w16 #(.sram_bit(pr*bw)) kmem_instance (
+sram_w16_sram_bit64 kmem_instance (
         .CLK(clk),
         .D(mem_in),
         .Q(kmem_out),
@@ -93,7 +93,7 @@ sram_w16 #(.sram_bit(pr*bw)) kmem_instance (
         .A(qkmem_add)
 );
 
-sram_w16 #(.sram_bit(col*bw_psum)) psum_mem_instance (
+sram_w16_sram_bit160 psum_mem_instance (
         .CLK(clk),
         .D(pmem_in),
         .Q(pmem_out),
