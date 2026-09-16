@@ -54,7 +54,10 @@ analyze -format verilog -lib WORK fifo_depth16.v
 analyze -format verilog -lib WORK fifo_mux_16_1.v
 analyze -format verilog -lib WORK fifo_mux_8_1.v
 analyze -format verilog -lib WORK fifo_mux_2_1.v
+# The memories are library macros now, not logic. The behavioural RTL stays
+# out; the stub below only declares their ports.
 #analyze -format verilog -lib WORK sram_w16.v
+analyze -format verilog -lib WORK sram_macro_stub.v
 analyze -format verilog -lib WORK sync.v
 
 elaborate $top_module -lib WORK -update
@@ -62,6 +65,31 @@ current_design $top_module
 
 # Link Design
 link
+
+# Keep the macro stubs exactly as declared.
+#
+# Without this, Design Compiler treats an unresolved or empty design as one it
+# owns. The first Stage B run uniquified the two 64 bit instances into
+# sram_w16_sram_bit64_0 and _1, and boundary optimization absorbed the write
+# enable inverter into the boundary and renamed the port to WEN_BAR. Innovus
+# then matched only one of the three cells against the Stage A abstracts and
+# built the other two as empty hierarchical shells, without an error.
+#
+# The manual is explicit about the second one (set_boundary_optimization,
+# syn_command.pdf printed page 1874): "This might change the function of the
+# object, so the object must not be used in any other context." A macro is
+# exactly an object used in another context.
+set macro_designs [get_designs {sram_w16_sram_bit64 sram_w16_sram_bit160}]
+if { [sizeof_collection $macro_designs] != 2 } {
+    echo "****************************************************"
+    echo "* ERROR!!!! expected 2 macro stub designs           *"
+    echo "* Check that sram_macro_stub.v was analyzed and that*"
+    echo "* core.v instantiates the macros by name, with no   *"
+    echo "* parameter override.                               *"
+    echo "****************************************************"
+}
+set_boundary_optimization $macro_designs false
+set_dont_touch $macro_designs true
 
 # Default SDC Constraints
 read_sdc ${top_module}.sdc
