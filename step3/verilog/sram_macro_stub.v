@@ -1,16 +1,17 @@
 // Synthesis-only stubs for the two SRAM macros built in Stage A.
 //
-// Why these exist: with no module declaration at all, Design Compiler treats
-// the memories as unresolved black boxes that it owns. The first Stage B run
-// proved what that costs - it uniquified the two 64 bit instances into
-// sram_w16_sram_bit64_0 and _1, and boundary optimization pulled the write
-// enable inverter through the port and renamed it WEN_BAR. Innovus then
-// matched only sram_w16_sram_bit160 against the abstracts and silently built
-// the other two as empty hierarchical shells.
+// Why these exist: core.v instantiates the memories by the names the Stage A
+// abstracts carry, sram_w16_sram_bit64 and sram_w16_sram_bit160, so Innovus
+// can match every memory in the netlist to its LEF. These declarations give
+// Design Compiler the ports, widths and directions of those cells; a module it
+// has never seen links as an unresolved reference with unknown pin directions.
 //
-// Declaring the ports here removes the guesswork. run_dc.tcl additionally
-// sets dont_touch and turns boundary optimization off on both designs, which
-// is what stops the uniquify and the port rename. All three are needed.
+// They are empty on purpose, and they only work if nothing else supplies the
+// logic. The first Stage B runs left sram_w16.v out of the analyze list and
+// still synthesized all three memories as flip-flops, because a Stage A run
+// had left sram_w16 in the WORK design library of the same directory. The
+// uniquified _0 / _1 names and the WEN_BAR port came from that logic. See the
+// comments in run_dc.tcl for the numbers and for the dont_touch guard.
 //
 // Port names, order and widths follow sram_w16.v and the widths core.v
 // elaborates to: pr*bw = 64 for qmem and kmem, col*bw_psum = 160 for pmem.

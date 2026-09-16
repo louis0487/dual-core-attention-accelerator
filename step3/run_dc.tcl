@@ -54,8 +54,17 @@ analyze -format verilog -lib WORK fifo_depth16.v
 analyze -format verilog -lib WORK fifo_mux_16_1.v
 analyze -format verilog -lib WORK fifo_mux_8_1.v
 analyze -format verilog -lib WORK fifo_mux_2_1.v
-# The memories are library macros now, not logic. The behavioural RTL stays
-# out; the stub below only declares their ports.
+# The memories are hard macros now, not logic. The behavioural RTL stays out
+# and the stub below only declares their ports.
+#
+# Leaving sram_w16.v out is not enough on its own. elaborate also looks in the
+# WORK design library, and that directory survives between runs unless the
+# cleanup at the top of this script removes the same path define_design_lib
+# points at. Stage A analyzed sram_w16.v into the library in this directory,
+# so the first Stage B runs found it there and synthesized all three memories
+# as flip-flops anyway, 1088 + 1088 + 2720 = 4896 of them. The clock fanout
+# shows it: 9085 loads with the stale library, 4192 with the stubs, which is
+# 9085 - 4896 plus the three macro clock pins.
 #analyze -format verilog -lib WORK sram_w16.v
 analyze -format verilog -lib WORK sram_macro_stub.v
 analyze -format verilog -lib WORK sync.v
@@ -68,17 +77,20 @@ link
 
 # Keep the macro stubs exactly as declared.
 #
-# Without this, Design Compiler treats an unresolved or empty design as one it
-# owns. The first Stage B run uniquified the two 64 bit instances into
-# sram_w16_sram_bit64_0 and _1, and boundary optimization absorbed the write
-# enable inverter into the boundary and renamed the port to WEN_BAR. Innovus
-# then matched only one of the three cells against the Stage A abstracts and
-# built the other two as empty hierarchical shells, without an error.
+# The count catches a stub that was never analyzed, or a core.v that still
+# instantiates sram_w16 with a parameter while the library is clean. It cannot
+# tell a stub from a behavioural memory of the same name, which is why the
+# library has to be clean; the clock fanout in the log is the cross-check.
 #
-# The manual is explicit about the second one (set_boundary_optimization,
-# syn_command.pdf printed page 1874): "This might change the function of the
-# object, so the object must not be used in any other context." A macro is
-# exactly an object used in another context.
+# What went wrong before came from synthesizing the stale behavioural
+# memories: the two 64 bit copies were uniquified into sram_w16_sram_bit64_0
+# and _1, and boundary optimization pulled the write enable inverter from
+# core.v into the memory, complementing the port and renaming it WEN_BAR (the
+# complemented-port case, set_boundary_optimization, syn_command.pdf printed
+# page 1874). Neither should happen to these designs: uniquify creates no new
+# design for anything carrying dont_touch (printed page 2571) and skips black
+# box designs by default (printed page 2570), and with boundary optimization
+# off no port is rewritten. The attributes cost nothing and say it explicitly.
 set macro_designs [get_designs {sram_w16_sram_bit64 sram_w16_sram_bit160}]
 if { [sizeof_collection $macro_designs] != 2 } {
     echo "****************************************************"

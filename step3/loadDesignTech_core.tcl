@@ -67,11 +67,13 @@ init_design -setup {WC_VIEW} -hold {BC_VIEW}
 set_interactive_constraint_modes {CON}
 setDesignMode -process 65
 
-# Read back what actually came in. The synthesis netlist names the memories
-# sram_w16_sram_bit64_0, _1 and sram_w16_sram_bit160 because Design Compiler
-# uniquified the two unresolved black boxes; the abstracts above are named
-# without the _0 / _1 suffix. If that mismatch bites, it bites here, in the
-# first minute, not after a full place and route.
+# Read back what actually came in. Each memory has to resolve to one of the
+# abstracts above: sram_w16_sram_bit64 twice, sram_w16_sram_bit160 once. A
+# cell name with no matching LEF is not an error when the netlist also defines
+# it as a module - init_design builds it as an ordinary hierarchical instance
+# and carries on with fewer macros. An earlier netlist did exactly that: its
+# two 64 bit memories were synthesized logic named _0 and _1. Catch it here,
+# in the first minute, not after a full place and route.
 puts ""
 proc ldc_list {expr_} {
     set v ""
