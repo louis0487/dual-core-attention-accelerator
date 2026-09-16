@@ -54,7 +54,7 @@ analyze -format verilog -lib WORK fifo_depth16.v
 analyze -format verilog -lib WORK fifo_mux_16_1.v
 analyze -format verilog -lib WORK fifo_mux_8_1.v
 analyze -format verilog -lib WORK fifo_mux_2_1.v
-analyze -format verilog -lib WORK sram_w16.v
+#analyze -format verilog -lib WORK sram_w16.v
 analyze -format verilog -lib WORK sync.v
 
 elaborate $top_module -lib WORK -update

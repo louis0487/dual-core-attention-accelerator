@@ -106,12 +106,12 @@ sfp_row #(.col(col), .bw(bw), .bw_psum(bw_psum)) sfp_row_instance (
 	.clk(clk),
 	.reset(reset),
 	.sfp_in(pmem_out),
-	.sum_in(0),
+	.sum_in({(bw_psum+4){1'b0}}),
 	.sum_out(sum_out),
 	.sfp_out(sfp_out),
 	.acc(acc),
 	.div(div),
-	.fifo_ext_rd(0)
+	.fifo_ext_rd(1'b0)
 );
 
 
