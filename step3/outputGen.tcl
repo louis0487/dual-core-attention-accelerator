@@ -1,4 +1,13 @@
-streamOut ${design}.gds2
+# The chip layout only references the macros. Merge their Stage A layouts in,
+# or the GDS has three empty cells (streamOut -merge, innovusTCR p.1669).
+set macro_gds "./subckt/sram_w16_sram_bit64.gds2 ./subckt/sram_w16_sram_bit160.gds2"
+foreach f $macro_gds {
+    if {![file readable $f]} {
+        puts "outputGen: ERROR - cannot read $f; copy the Stage A GDS into ./subckt first"
+        return
+    }
+}
+streamOut ${design}.gds2 -merge $macro_gds
 write_lef_abstract ${design}.lef
 defOut -netlist -routing ${design}.def
 saveNetlist ${design}.pnr.v
