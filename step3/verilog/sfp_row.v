@@ -1,7 +1,7 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
 module sfp_row (clk, acc, div, fifo_ext_rd, reset, sum_in, sum_out, sfp_in, sfp_out);
-
+// synopsys sync_set_reset "reset"
   parameter col = 8;
   parameter bw = 8;
   parameter bw_psum = 2*bw+4;
