@@ -1,10 +1,18 @@
 #!/bin/sh
-# Gate-level simulation of the routed step 1 netlist.
+# Gate-level simulation of the routed step 3 netlist.
 #
-# Run from step1/, after place-and-route has written fullchip.pnr.v and
+# Run from step3/, after place-and-route has written fullchip.pnr.v and
 # fullchip_WC.sdf into this directory. COURSE_PDK must point at the PDK root.
 # The cell models are referenced where they live, so no foundry file is ever
 # copied into this tree.
+#
+# Step 3 is the hierarchical build: the three memories are hard macros, so the
+# top netlist only instantiates them and their models have to be supplied
+# here. The two Stage A netlists below cover all three instances -
+# sram_w16_sram_bit64 serves qmem and kmem, sram_w16_sram_bit160 serves the
+# psum memory. sram_macro_stub.v is a synthesis-only file and must NEVER be
+# listed here: it declares the ports and nothing else, so every read would
+# return X and the hunt would start in the wrong place.
 #
 #   ./run_gui                  batch: everything goes to stdout, so
 #                              ./run_gui 2>&1 | tee gls.log captures the SDF
@@ -14,11 +22,13 @@
 #                              to stdout - a piped log will hold only the
 #                              elaboration messages.
 #
-# The clock runs at 2.0 ns here, not at the 1.0 ns target. Post-route reg2reg
-# WNS is -0.170 ns, so the netlist does not close at 1 GHz, and the testbench
-# gives its inputs only half a period of setup where the SDC assumed 0.8 ns.
-# Tighten it from the command line to find where the netlist stops working:
-#   +define+CLK_HALF=0.7        -> 1.4 ns period
+# The clock runs at 5.0 ns here, not at the 1.0 ns target. Post-route setup
+# WNS is -3.035 ns and the worst path carries 3.956 ns of logic between two
+# flops, so the netlist cannot work below roughly 4.1 ns; the testbench also
+# gives its inputs only half a period of setup. Tighten it from the command
+# line to find where the netlist stops working - breaking near 4.1 ns is an
+# independent check on the static timing number:
+#   +define+CLK_HALF=2.0        -> 4.0 ns period
 #
 # SEQ_UDP gives sequential UDPs a floor delay. SDF annotation is never quite
 # complete - the course flow reports around 90% - and whatever it misses is
@@ -56,8 +66,9 @@ GUI=${GUI:-}
 SEQ_UDP=${SEQ_UDP:-}
 if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 
-# INIT0=1 zero-initializes variables and memories. MEASURED INEFFECTIVE for
-# this netlist: the flop state lives in the 26k UDP primitives, which
+# INIT0=1 zero-initializes variables and memories. Measured ineffective on the
+# step 1 netlist and not re-measured here: the flop state lives in UDP
+# primitives, which
 # -initreg0/-initmem0 do not touch, so the X power-up state survives and the
 # X-locked reset cones (see below) never clear. Kept because it documents the
 # attempt and still applies to variable-based models.
@@ -71,14 +82,14 @@ if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 # DC map the rest the same way via the sync_set_reset directive.
 if [ -n "${INIT0:-}" ]; then INIT_OPT="-initreg0 -initmem0"; else INIT_OPT=; fi
 
-# CLK_HALF=<ns> overrides the clock half period. The default GLS value of 1.0
-# equals the testbench input-change offset, and the CTS insertion delay spans
-# 0.794 to 1.118 ns: flops whose clock arrives later than the input change
-# capture the next cycle's value one cycle early, which showed up as several
-# fifo columns reading one row behind - byte-identical across three different
-# SDFs, because the effect quantizes to whole cycles. Slowing the simulation
-# clock past the insertion delay is the standard remedy and claims nothing
-# about design speed; the frequency claim rests on STA.
+# CLK_HALF=<ns> overrides the clock half period, whose GLS default lives in
+# the testbench. Two things set the floor here. The logic depth needs about
+# 4.1 ns, and the clock insertion delay spans 0.288 to 1.404 ns
+# (fullchip.post_route.skew.rpt): a flop whose clock arrives later than the
+# testbench changes its inputs captures the next cycle's value one cycle
+# early, which in step 1 showed up as fifo columns reading one row behind.
+# Slowing the simulation clock past both is the standard remedy and claims
+# nothing about design speed; the frequency claim rests on STA.
 #   CLK_HALF=2.0 ./run_gui
 if [ -n "${CLK_HALF:-}" ]; then CLK_DEF=+define+CLK_HALF=$CLK_HALF; else CLK_DEF=; fi
 
@@ -87,10 +98,14 @@ if [ -n "${RTL:-}" ]; then
     SRC="-f ./filelist"
 else
     GLS_DEF=+define+GLS
-    SRC="-v ${NETLIST:-./fullchip.pnr.v}\
-	 -v $COURSE_PDK/verilog/tcbn65gplus.v ./verilog/fullchip_tb.v\
-	 -v ./subckt/sram_w16_sram_bit64.pnr.v\
-	 -v ./subckt/sram_w16_sram_bit160.pnr.v\
+    # -v marks a library file: xrun pulls a module out of it only when
+    # something instantiates that module, so nothing here can become a top.
+    # The testbench is the one plain source file, and it must be listed once -
+    # listing it twice defines fullchip_tb twice and elaboration stops.
+    SRC="-v ${NETLIST:-./fullchip.pnr.v} \
+	 -v ./subckt/sram_w16_sram_bit64.pnr.v \
+	 -v ./subckt/sram_w16_sram_bit160.pnr.v \
+	 -v $COURSE_PDK/verilog/tcbn65gplus.v \
 	 ./verilog/fullchip_tb.v"
 fi
 
