@@ -67,6 +67,8 @@ init_design -setup {WC_VIEW} -hold {BC_VIEW}
 set_interactive_constraint_modes {CON}
 setDesignMode -process 65
 
+setMultiCpuUsage -localCpu 4
+
 # Read back what actually came in. Each memory has to resolve to one of the
 # abstracts above: sram_w16_sram_bit64 twice, sram_w16_sram_bit160 once. A
 # cell name with no matching LEF is not an error when the netlist also defines
