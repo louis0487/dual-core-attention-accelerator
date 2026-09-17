@@ -1,0 +1,11 @@
+diff --git a/step3/outputGen_sram.tcl b/step3/outputGen_sram.tcl
+index 77231b9..fec1379 100644
+--- a/step3/outputGen_sram.tcl
++++ b/step3/outputGen_sram.tcl
+@@ -1,5 +1,5 @@
+ streamOut ${design}.gds2
+-write_lef_abstract ${design}.lef -specifyTopLayer 4
++write_lef_abstract ${design}.lef -specifyTopLayer 4 -stripePin -PGpinLayers 4
+ defOut -netlist -routing ${design}.def
+ saveNetlist ${design}.pnr.v
+ 

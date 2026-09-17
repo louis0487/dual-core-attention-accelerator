@@ -26,8 +26,8 @@
 #   ori_qk   : qmem with D on LEFT, Q on RIGHT and CLK on TOP
 # Run orient_probe in its own session and restart before sourcing this file;
 # its header says not to save a design from the session it ran in.
-set ori_pmem ""
-set ori_qk   ""
+set ori_pmem "MX"
+set ori_qk   "R270"
 if {$ori_pmem eq "" || $ori_qk eq ""} {
     puts "initialFloorplan: ERROR - set ori_pmem and ori_qk from the orient_probe tables first"
     return
@@ -74,8 +74,8 @@ addRing -spacing {top 2 bottom 2 left 2 right 2} -width {top 3 bottom 3 left 3 r
 # inside y 20-98. The manual measures the offset from the boundary of the
 # stripe area without saying whether that is the core edge or the ring, so
 # check in the GUI that every macro has a VDD/VSS pair across it.
-addStripe -nets {VDD VSS} -layer M6 -direction vertical -width 2 -spacing 2 -set_to_set_distance 20 -start_from left -start_offset 30 -stacked_via_bottom_layer M1 -stacked_via_top_layer M6
 addStripe -nets {VDD VSS} -layer M5 -direction horizontal -width 2 -spacing 2 -set_to_set_distance 40 -start_from bottom -start_offset 30 -stacked_via_bottom_layer M1 -stacked_via_top_layer M6
+addStripe -nets {VDD VSS} -layer M6 -direction vertical -width 2 -spacing 2 -set_to_set_distance 20 -start_from left -start_offset 30 -stacked_via_bottom_layer M1 -stacked_via_top_layer M6
 
 # Only the standard cell follow pins. The macro pins are already tied in by the
 # stripe vias; left to its default, sroute tries all five kinds (p.2862).

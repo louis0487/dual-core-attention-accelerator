@@ -11,7 +11,7 @@
 
 # The end of qmem's left edge where D[0] lands after the rotation, top or
 # bottom, read off the same orient_probe table as ori_qk.
-set qk_d0_end ""
+set qk_d0_end "top"
 if {$qk_d0_end ne "top" && $qk_d0_end ne "bottom"} {
     puts "pinPlacement: ERROR - set qk_d0_end to top or bottom from the orient_probe table first"
     return

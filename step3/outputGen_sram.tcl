@@ -12,3 +12,6 @@ setAnalysisMode -hold
 set_analysis_view -setup BC_VIEW -hold BC_VIEW
 do_extract_model -view BC_VIEW -format dotlib ${design}_BC.lib
 write_sdf -view BC_VIEW ${design}_BC.sdf
+
+setAnalysisMode -setup
+set_analysis_view -setup WC_VIEW -hold BC_VIEW
