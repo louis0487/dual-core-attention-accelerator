@@ -39,6 +39,15 @@ set compile_no_new_cells_at_top_level false
 set hdlin_enable_vpp true
 set hdlin_auto_save_templates false
 
+# Parallel execution. compile_ultra uses up to this many cores on the same
+# machine (syn_command.pdf, printed page 2127: the default is 1, which means
+# no parallel execution, and the maximum is 16). The speedup is not linear -
+# only parts of the compile are threaded - and ieng6 is shared, so keep the
+# number modest. report_host_options prints what is in effect, and a compile
+# whose reported CPU time exceeds its elapsed time is the sign that the
+# threads are actually running.
+set_host_options -max_cores 4
+
 define_design_lib WORK -path template
 set verilogout_single_bit false
 
