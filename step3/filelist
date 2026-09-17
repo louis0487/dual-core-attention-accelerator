@@ -8,6 +8,7 @@
 ./verilog/mac_8in.v
 ./verilog/mac_array.v
 ./verilog/sram_w16.v
+./verilog/sram_macro_model.v
 ./verilog/ofifo.v
 ./verilog/fifo_depth16.v
 ./verilog/fifo_mux_16_1.v
