@@ -36,13 +36,19 @@
 # the static timing number:
 #   CLK_HALF=1.6 ./run_gui      -> 3.2 ns period
 #
-# SEQ_UDP gives sequential UDPs a floor delay, and it is ON by default. A
-# netlist simulated without SDF has no delays at all, so data and clock reach
-# a flop at the same instant and race; with SDF, annotation is never quite
-# complete - the course flow reports around 90% - and whatever it misses is
-# left at zero delay, where a cell can race its own clock and settle to X.
-#   SEQ_UDP=0 ./run_gui                        off for this run
-#   SEQ_UDP=+xmseq_udp_delay+50ps ./run_gui    a different floor
+# SEQ_UDP gives sequential UDPs a floor delay. It is ON by default for NO_SDF
+# runs only: a netlist simulated without SDF has no delays at all, so data and
+# clock reach a flop at the same instant and race.
+#
+# It is OFF by default whenever the SDF is in use, because the two do not mix.
+# With it on, xmelab printed *W,SDFSKPA - "Ignore $sdf_annotate ... because of
+# -nospecify option" - although nothing on this command line asks for
+# -nospecify, and the run that looked like an SDF pass was in fact zero-delay.
+# Step 1's own SDF run (step1/README.md) did not use it either. So when a run
+# is meant to carry the SDF, check the log for the SDF statistics and for the
+# absence of SDFSKPA; a PASS alone proves nothing about annotation.
+#   NO_SDF=1 SEQ_UDP=0 ./run_gui               off for a zero-delay run
+#   NO_SDF=1 SEQ_UDP=+xmseq_udp_delay+50ps ./run_gui    a different floor
 # To turn it off by default, comment out the SEQ_UDP_DEFAULT line below.
 #
 # NETLIST picks which netlist to simulate. Post-synthesis simulation is the
@@ -72,11 +78,16 @@ GUI=${GUI:-}
 if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 
 # Comment out this one line to run without the sequential UDP floor by default.
+# The default applies to NO_SDF runs only - see the note above on SDFSKPA.
 SEQ_UDP_DEFAULT=+xmseq_udp_delay+20ps
 case "${SEQ_UDP-}" in
     0)  SEQ_UDP= ;;                            # off for this run
     +*) ;;                                     # an explicit option, as given
-    *)  SEQ_UDP=${SEQ_UDP_DEFAULT-} ;;         # the default, or off if unset
+    *)  if [ -n "${NO_SDF:-}" ]; then          # zero-delay run: floor on
+            SEQ_UDP=${SEQ_UDP_DEFAULT-}
+        else                                   # SDF run: floor off
+            SEQ_UDP=
+        fi ;;
 esac
 
 # INIT0=1 zero-initializes variables and memories. Measured ineffective on the
