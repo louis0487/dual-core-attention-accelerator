@@ -10,7 +10,7 @@ foreach f $macro_gds {
 streamOut ${design}.gds2 -merge $macro_gds
 write_lef_abstract ${design}.lef
 defOut -netlist -routing ${design}.def
-saveNetlist ${design}.pnr.v
+saveNetlist ${design}.pnr.v -excludeCellDef {sram_w16_sram_bit64 sram_w16_sram_bit160}
 
 setAnalysisMode -setup
 set_analysis_view -setup WC_VIEW -hold WC_VIEW

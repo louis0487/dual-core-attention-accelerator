@@ -51,7 +51,7 @@ if { $nh != 0 } {
     return
 }
 
-saveNetlist ${design}.pnr.v
+saveNetlist ${design}.pnr.v -excludeCellDef {sram_w16_sram_bit64 sram_w16_sram_bit160}
 
 setAnalysisMode -setup
 set_analysis_view -setup WC_VIEW -hold WC_VIEW
