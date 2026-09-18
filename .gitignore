@@ -1,4 +1,4 @@
-# EDA build outputs — NDA red line: mapped netlists / PDK-derived files never enter this repo
+# EDA build outputs - NDA red line: mapped netlists / PDK-derived files never enter this repo
 # (repo carries: RTL source, own tcl scripts, README/report numbers. Nothing tool-generated.)
 
 # synthesis / PnR / simulation outputs
@@ -86,6 +86,13 @@ log/
 undriven_dc.txt
 undriven_pnr.txt
 undriven.log
+
+# derived netlists and reports whose suffix the patterns above miss
+# (a name like fullchip.pnr.sim.v does not match *.pnr.v). run_gui writes its
+# cleaned simulation copies under gls/, which is ignored above.
+*.sim.v
+*.gls.v
+*.chk
 
 # numbered tool logs and compiled SDF - the bare patterns above miss these
 # (innovus.log1, innovus.logv2, fullchip_WC.sdf.X all slipped through once)

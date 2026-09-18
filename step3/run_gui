@@ -14,6 +14,11 @@
 # listed here: it declares the ports and nothing else, so every read would
 # return X and the hunt would start in the wrong place.
 #
+# The stub also arrives by a second route, inside the netlist itself, and this
+# script removes it on every run - see the note above SRC below. The cleaned
+# copy goes under gls/, which .gitignore keeps out of the repo: it is a mapped
+# netlist, and a mapped netlist must never be committed.
+#
 #   ./run_gui                  batch: everything goes to stdout, so
 #                              ./run_gui 2>&1 | tee gls.log captures the SDF
 #                              statistics and the PASS/FAIL line
@@ -23,26 +28,28 @@
 #                              elaboration messages.
 #
 # The clock runs at 5.0 ns here, not at the 1.0 ns target. Post-route setup
-# WNS is -3.035 ns and the worst path carries 3.956 ns of logic between two
-# flops, so the netlist cannot work below roughly 4.1 ns; the testbench also
-# gives its inputs only half a period of setup. Tighten it from the command
-# line to find where the netlist stops working - breaking near 4.1 ns is an
-# independent check on the static timing number:
-#   +define+CLK_HALF=2.0        -> 4.0 ns period
+# WNS is -2.151 ns at 1.0 ns (timingReports/postRoute.summary, second PnR run),
+# so static timing puts the minimum period at 1.0 + 2.151 = 3.151 ns, useful
+# skew included; the testbench also gives its inputs only half a period of
+# setup. Tighten it from the command line to find where the SDF-annotated
+# netlist stops working - failing near 3.15 ns would be an independent check on
+# the static timing number:
+#   CLK_HALF=1.6 ./run_gui      -> 3.2 ns period
 #
-# SEQ_UDP gives sequential UDPs a floor delay. SDF annotation is never quite
+# SEQ_UDP gives sequential UDPs a floor delay, and it is ON by default. A
+# netlist simulated without SDF has no delays at all, so data and clock reach
+# a flop at the same instant and race; with SDF, annotation is never quite
 # complete - the course flow reports around 90% - and whatever it misses is
 # left at zero delay, where a cell can race its own clock and settle to X.
-# Set it if the output comes back X:
-#   SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui
+#   SEQ_UDP=0 ./run_gui                        off for this run
+#   SEQ_UDP=+xmseq_udp_delay+50ps ./run_gui    a different floor
+# To turn it off by default, comment out the SEQ_UDP_DEFAULT line below.
 #
 # NETLIST picks which netlist to simulate. Post-synthesis simulation is the
 # standard gate between synthesis and place-and-route, and this flow skipped
 # it, so a failure downstream cannot be pinned on either tool. Run the
-# synthesis netlist with no SDF - there is none for it - and with a sequential
-# UDP delay, which a zero-delay netlist needs because data and clock otherwise
-# reach a flop at the same instant and race:
-#   NETLIST=./netlist/fullchip.out.v NO_SDF=1 SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui
+# synthesis netlist with no SDF - there is none for it:
+#   NETLIST=./netlist/fullchip.out.v NO_SDF=1 ./run_gui
 # Failing there too means the netlist left synthesis already broken. Passing
 # there means place-and-route is where it broke.
 #
@@ -50,9 +57,8 @@
 # one run: a correct readout without the SDF and X with it means the fault is
 # in the timing. X either way narrows it far less than it looks - the two runs
 # still share the testbench, the library and this invocation - so read it as
-# "not timing" and nothing more. Pair it with SEQ_UDP, since an un-annotated
-# netlist has no delays at all:
-#   NO_SDF=1 SEQ_UDP=+xmseq_udp_delay+20ps ./run_gui 2>&1 | tee gls_nosdf.log
+# "not timing" and nothing more:
+#   NO_SDF=1 ./run_gui 2>&1 | tee gls_nosdf.log
 #
 # RTL=1 runs the RTL through this same invocation instead of a netlist, from
 # the course filelist and with no GLS define. The RTL was signed off under a
@@ -63,8 +69,15 @@
 # simulator, and clears synthesis and place-and-route entirely.
 
 GUI=${GUI:-}
-SEQ_UDP=${SEQ_UDP:-}
 if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
+
+# Comment out this one line to run without the sequential UDP floor by default.
+SEQ_UDP_DEFAULT=+xmseq_udp_delay+20ps
+case "${SEQ_UDP-}" in
+    0)  SEQ_UDP= ;;                            # off for this run
+    +*) ;;                                     # an explicit option, as given
+    *)  SEQ_UDP=${SEQ_UDP_DEFAULT-} ;;         # the default, or off if unset
+esac
 
 # INIT0=1 zero-initializes variables and memories. Measured ineffective on the
 # step 1 netlist and not re-measured here: the flop state lives in UDP
@@ -83,8 +96,8 @@ if [ -n "${NO_SDF:-}" ]; then NO_SDF_DEF=+define+NO_SDF; else NO_SDF_DEF=; fi
 if [ -n "${INIT0:-}" ]; then INIT_OPT="-initreg0 -initmem0"; else INIT_OPT=; fi
 
 # CLK_HALF=<ns> overrides the clock half period, whose GLS default lives in
-# the testbench. Two things set the floor here. The logic depth needs about
-# 4.1 ns, and the clock insertion delay spans 0.288 to 1.404 ns
+# the testbench. Two things set the floor here. Static timing needs 3.151 ns,
+# and the clock insertion delay spans 0.303 to 1.951 ns
 # (fullchip.post_route.skew.rpt): a flop whose clock arrives later than the
 # testbench changes its inputs captures the next cycle's value one cycle
 # early, which in step 1 showed up as fifo columns reading one row behind.
@@ -98,11 +111,28 @@ if [ -n "${RTL:-}" ]; then
     SRC="-f ./filelist"
 else
     GLS_DEF=+define+GLS
+
+    # Both netlists this flow writes carry two empty modules named after the
+    # macros. Synthesis writes the port-only stub because write -hier writes
+    # every design it holds, and Innovus writes it back out because saveNetlist
+    # includes leaf cell definitions by default (innovusTCR, saveNetlist).
+    # Left in, they shadow the Stage A models below - xrun reports LIBNOU,
+    # "given but not used", for those - and the memories read back as Z.
+    # Strip them into a copy on every run so no netlist can slip through.
+    NL=${NETLIST:-./fullchip.pnr.v}
+    [ -r "$NL" ] || { echo "run_gui: cannot read netlist $NL" >&2; exit 1; }
+    mkdir -p gls
+    GLS_NL=gls/$(basename "$NL" .v).gls.v
+    MACRO_DEF='^module sram_w16_sram_bit(64|160)[ (]'
+    n=$(grep -cE "$MACRO_DEF" "$NL")
+    awk -v re="$MACRO_DEF" '$0 ~ re {skip=1} !skip {print} /^endmodule/ {if (skip) skip=0}' "$NL" > "$GLS_NL"
+    echo "run_gui: $NL -> $GLS_NL, $n macro module definition(s) removed"
+
     # -v marks a library file: xrun pulls a module out of it only when
     # something instantiates that module, so nothing here can become a top.
     # The testbench is the one plain source file, and it must be listed once -
     # listing it twice defines fullchip_tb twice and elaboration stops.
-    SRC="-v ${NETLIST:-./fullchip.pnr.v} \
+    SRC="-v $GLS_NL \
 	 -v ./subckt/sram_w16_sram_bit64.pnr.v \
 	 -v ./subckt/sram_w16_sram_bit160.pnr.v \
 	 -v $COURSE_PDK/verilog/tcbn65gplus.v \

@@ -6,16 +6,15 @@
 // Clock half period, in the 1 ns units of the timescale above.
 //
 // Behavioural simulation runs at the 1.0 ns target. Gate-level simulation
-// cannot: post-route setup WNS is -3.035 ns, and the worst path carries
-// 3.956 ns of logic between two flops (timingReports/postRoute.summary and
-// fullchip.post_route.timing_setup.rpt), so the routed netlist needs a period
-// above roughly 4.1 ns. 5.0 ns clears that and still leaves this testbench
-// half a period of input setup.
+// cannot: post-route setup WNS is -2.151 ns at 1.0 ns (second PnR run,
+// timingReports/postRoute.summary), so static timing puts the minimum period
+// at 3.151 ns, useful skew included. 5.0 ns clears that and still leaves this
+// testbench half a period of input setup.
 //
-// Override from the command line to find where the netlist stops working -
-// the point where it breaks should land near the number static timing
-// analysis reported, which is an independent check on that number:
-//   xrun ... +define+CLK_HALF=2.0      -> 4.0 ns period
+// Override from the command line to find where the SDF-annotated netlist
+// stops working - the point where it breaks should land near the number
+// static timing analysis reported, which is an independent check on it:
+//   xrun ... +define+CLK_HALF=1.6      -> 3.2 ns period
 `ifndef CLK_HALF
   `ifdef GLS
     `define CLK_HALF 2.5
