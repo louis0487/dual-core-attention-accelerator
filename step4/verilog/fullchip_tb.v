@@ -1,606 +1,403 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
-// Please do not spread this code without permission 
+// Please do not spread this code without permission
+//
+// Dual-core testbench for step 4, rewritten from the step 3 testbench.
+//
+// Two free-running clocks with unrelated periods drive the two cores. Each
+// core is fed by its own core_drv, which replays the step 3 sequence (Q/K
+// write, K load, execute, ofifo -> pmem, readout) on that core's clock. The two
+// drivers only meet at barriers, and only where the cores depend on each other:
+// around every row-sum exchange of the normalization.
+//
+// Checks, per core:
+//   RESULT       Q x K rows against the testbench model
+//   NORM RESULT  normalized rows. Both cores divide by the same number,
+//                (S0 >> 7) + (S1 >> 7): sfp_row.v:61 truncates each core's
+//                sum before adding them, and the model does exactly that.
+//   NV RESULT    norm x V on the same hardware (FAQ 32): norm_coreN.txt goes
+//                into qmem, vdata.txt into kmem, each core on its own with no
+//                cross-core merge (R4 ruling F1).
+//
+// norm_core0/1.txt are the inputs of the norm x V run, not the expected output
+// of the normalization - they do not match the hardware model of this Q/K data
+// - so the normalization is checked against the model, as in step 3.
+//
+// Override the clocks from the command line, e.g. +define+CLK1_HALF=2.0.
+// Keep the two periods unrelated (not an integer ratio): the point of this
+// step is that the cores do not share a clock.
 
 `timescale 1ns/1ps
 
-// Clock half period, in the 1 ns units of the timescale above.
-//
-// Behavioural simulation runs at the 1.0 ns target. Gate-level simulation
-// cannot: post-route setup WNS is -2.151 ns at 1.0 ns (second PnR run,
-// timingReports/postRoute.summary), so static timing puts the minimum period
-// at 3.151 ns, useful skew included. 5.0 ns clears that and still leaves this
-// testbench half a period of input setup.
-//
-// Override from the command line to find where the SDF-annotated netlist
-// stops working - the point where it breaks should land near the number
-// static timing analysis reported, which is an independent check on it:
-//   xrun ... +define+CLK_HALF=1.6      -> 3.2 ns period
-`ifndef CLK_HALF
-  `ifdef GLS
-    `define CLK_HALF 2.5
-  `else
-    `define CLK_HALF 0.5
-  `endif
+`ifndef CLK0_HALF
+  `define CLK0_HALF 0.5
+`endif
+`ifndef CLK1_HALF
+  `define CLK1_HALF 0.65
 `endif
 
 module fullchip_tb;
 
-parameter total_cycle = 8;   // how many streamed Q vectors will be processed
-parameter bw = 8;            // Q & K vector bit precision
-parameter bw_psum = 2*bw+4;  // partial sum bit precision
-parameter pr = 8;           // how many products added in each dot product 
-parameter col = 8;           // how many dot product units are equipped
+parameter bw = 8;
+parameter bw_psum = 2*bw+4;
+parameter pr = 8;
+parameter col = 8;
 
-integer qk_file ; // file handler
-integer qk_scan_file ; // file handler
+reg clk0 = 0;
+reg clk1 = 0;
+always #`CLK0_HALF clk0 = ~clk0;
+always #`CLK1_HALF clk1 = ~clk1;
 
-
-integer  captured_data;
-integer  weight [col*pr-1:0];
-`define NULL 0
-
-
-
-
-integer  K[col-1:0][pr-1:0];
-integer  Q[total_cycle-1:0][pr-1:0];
-integer  result[total_cycle-1:0][col-1:0];
-integer  sum[total_cycle-1:0];
-
-integer i,j,k,t,p,q,s,u, m;
-
-
-
-
-
-reg reset = 1;
-reg clk = 0;
-reg [pr*bw-1:0] mem_in; 
-reg ofifo_rd = 0;
-wire [19:0] inst; 
-reg norm = 0;
-reg div  = 0;
-reg acc  = 0;
-reg qmem_rd = 0;
-reg qmem_wr = 0; 
-reg kmem_rd = 0; 
-reg kmem_wr = 0;
-reg pmem_rd = 0; 
-reg pmem_wr = 0; 
-reg execute = 0;
-reg load = 0;
-reg [3:0] qkmem_add = 0;
-reg [3:0] pmem_add = 0;
-
-assign inst[19] = norm;
-assign inst[18] = div;
-assign inst[17] = acc;
-assign inst[16] = ofifo_rd;
-assign inst[15:12] = qkmem_add;
-assign inst[11:8]  = pmem_add;
-assign inst[7] = execute;
-assign inst[6] = load;
-assign inst[5] = qmem_rd;
-assign inst[4] = qmem_wr;
-assign inst[3] = kmem_rd;
-assign inst[2] = kmem_wr;
-assign inst[1] = pmem_rd;
-assign inst[0] = pmem_wr;
-
-
-
-reg [bw_psum-1:0] temp5b;
-reg [bw_psum+3:0] temp_sum;
-reg [bw_psum*col-1:0] temp16b;
-
-// readout path: chip output port, expected rows, and self-check counters
-wire [bw_psum*col-1:0] out;
-reg  [bw_psum*col-1:0] golden [total_cycle-1:0];
-integer errors;
-integer pass_cnt;
-
-// step 2: expected normalized rows and the scratch used to build them
-reg  [bw_psum*col-1:0] golden_norm [total_cycle-1:0];
-reg  [bw_psum*col-1:0] temp16bn;
-integer sum_abs;
-integer divisor;
-
-
+wire              reset0, reset1;
+wire [20:0]       inst0, inst1;
+wire [pr*bw-1:0]  mem_in0, mem_in1;
+wire [bw_psum*col-1:0] out0, out1;
+wire [7:0]        bar0, bar1;
+wire              done0, done1;
+wire [31:0]       err0, err1;
 
 // Synthesis resolves the parameters into the netlist, so the mapped fullchip
-// has an empty parameter list. Passing overrides to it is an elaboration
-// error, so the gate-level build instantiates it bare.
+// has an empty parameter list and the gate-level build instantiates it bare.
 `ifdef GLS
 fullchip fullchip_instance (
 `else
 fullchip #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) fullchip_instance (
 `endif
-      .reset(reset),
-      .clk(clk), 
-      .mem_in(mem_in), 
-      .inst(inst),
-      .out(out)
+      .clk0(clk0), .reset0(reset0), .inst0(inst0), .mem_in0(mem_in0), .out0(out0),
+      .clk1(clk1), .reset1(reset1), .inst1(inst1), .mem_in1(mem_in1), .out1(out1)
 );
 
+core_drv #(.ID(0), .KFILE("kdata_core0.txt"), .KFILE_OTHER("kdata_core1.txt"),
+           .NFILE("norm_core0.txt")) drv0 (
+      .clk(clk0), .reset(reset0), .inst(inst0), .mem_in(mem_in0), .out(out0),
+      .bar(bar0), .bar_other(bar1), .done(done0), .errors_total(err0)
+);
+
+core_drv #(.ID(1), .KFILE("kdata_core1.txt"), .KFILE_OTHER("kdata_core0.txt"),
+           .NFILE("norm_core1.txt")) drv1 (
+      .clk(clk1), .reset(reset1), .inst(inst1), .mem_in(mem_in1), .out(out1),
+      .bar(bar1), .bar_other(bar0), .done(done1), .errors_total(err1)
+);
 
 initial begin
-
-`ifdef GLS
-  // Back-annotate the worst-case corner SDF onto the routed netlist. This has
-  // to come first: annotation must land before any timing-dependent activity.
-  // The trailing arguments matter. The SDF carries min::max delay pairs, so
-  // without "MAXIMUM" the simulator picks the typical column, which these
-  // triplets leave empty.
-  //
-  // Use the SDF that flatOut.tcl writes, not the one from outputGen.tcl: only
-  // flatOut passes -recompute_delay_calc, and without it the tool merges the
-  // timing arcs between a pin pair into one entry, which stops matching the
-  // conditional specify paths of the XOR and adder cells (the tool's own
-  // SDF-808 message says as much).
-  //
-  // The three SRAM macros are black boxes to this file. Their internal timing
-  // needs one more $sdf_annotate each, scoped to the instance as the routed
-  // netlist names it - grep fullchip.pnr.v for sram_w16_sram_bit64 and
-  // sram_w16_sram_bit160 to read those names rather than guessing them, since
-  // flattening rewrites instance paths.
-`ifndef NO_SDF
-  $sdf_annotate("fullchip_WC.sdf", fullchip_instance, , , "MAXIMUM", "1:1:1", "FROM_MTM");
-`endif
-`endif
-
   $dumpfile("fullchip_tb.vcd");
-  $dumpvars(0,fullchip_tb);
-
-
-
-///// Q data txt reading /////
-
-$display("##### Q data txt reading #####");
-
-
-  qk_file = $fopen("qdata.txt", "r");
-
-
-
-  for (q=0; q<total_cycle; q=q+1) begin
-    for (j=0; j<pr; j=j+1) begin
-          qk_scan_file = $fscanf(qk_file, "%d\n", captured_data);
-          Q[q][j] = captured_data;
-          //$display("%d\n", K[q][j]);
-    end
-  end
-/////////////////////////////////
-
-
-
-
-  for (q=0; q<2; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;   
-    #`CLK_HALF clk = 1'b1;   
-  end
-
-
-
-
-///// K data txt reading /////
-
-$display("##### K data txt reading #####");
-
-  for (q=0; q<10; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;   
-    #`CLK_HALF clk = 1'b1;   
-  end
-  reset = 0;
-
-  qk_file = $fopen("kdata.txt", "r");
-
-
-
-
-
-  for (q=0; q<col; q=q+1) begin
-    for (j=0; j<pr; j=j+1) begin
-          qk_scan_file = $fscanf(qk_file, "%d\n", captured_data);
-          K[q][j] = captured_data;
-          //$display("##### %d\n", K[q][j]);
-    end
-  end
-/////////////////////////////////
-
-
-
-
-
-
-
-
-/////////////// Estimated result printing /////////////////
-
-
-$display("##### Estimated multiplication result #####");
-
-  for (t=0; t<total_cycle; t=t+1) begin
-     for (q=0; q<col; q=q+1) begin
-       result[t][q] = 0;
-     end
-  end
-
-  for (t=0; t<total_cycle; t=t+1) begin
-     for (q=0; q<col; q=q+1) begin
-         for (k=0; k<pr; k=k+1) begin
-            result[t][q] = result[t][q] + Q[t][k] * K[q][k];
-         end
-
-         temp5b = result[t][q];
-         temp16b = {temp16b[139:0], temp5b};
-     end
-
-     //$display("%d %d %d %d %d %d %d %d", result[t][0], result[t][1], result[t][2], result[t][3], result[t][4], result[t][5], result[t][6], result[t][7]);
-     golden[t] = temp16b;
-     $display("prd @cycle%2d: %40h", t, temp16b);
-  end
-
-//////////////////////////////////////////////
-
-
-///// Estimated normalized result /////
-
-$display("##### Estimated normalized result #####");
-
-  for (t=0; t<total_cycle; t=t+1) begin
-     sum_abs = 0;
-     for (q=0; q<col; q=q+1)
-        sum_abs = sum_abs + ((result[t][q] < 0) ? -result[t][q] : result[t][q]);
-
-     // the rtl divides by sum >> 7, so model exactly that - including the truncation
-     divisor = sum_abs >> 7;
-     if (divisor == 0)
-        $display("WARNING row %0d: divisor is 0, the rtl divide will produce x", t);
-
-     for (q=0; q<col; q=q+1) begin
-        temp5b   = ((result[t][q] < 0) ? -result[t][q] : result[t][q]) / divisor;
-        temp16bn = {temp16bn[139:0], temp5b};
-     end
-
-     golden_norm[t] = temp16bn;
-     $display("nrm @cycle%2d: %40h", t, temp16bn);
-  end
-
-//////////////////////////////////////////////
-
-
-
-
-
-
-///// Qmem writing  /////
-
-$display("##### Qmem writing  #####");
-
-  for (q=0; q<total_cycle; q=q+1) begin
-
-    #`CLK_HALF clk = 1'b0;  
-    qmem_wr = 1;  if (q>0) qkmem_add = qkmem_add + 1; 
-    
-    mem_in[1*bw-1:0*bw] = Q[q][0];
-    mem_in[2*bw-1:1*bw] = Q[q][1];
-    mem_in[3*bw-1:2*bw] = Q[q][2];
-    mem_in[4*bw-1:3*bw] = Q[q][3];
-    mem_in[5*bw-1:4*bw] = Q[q][4];
-    mem_in[6*bw-1:5*bw] = Q[q][5];
-    mem_in[7*bw-1:6*bw] = Q[q][6];
-    mem_in[8*bw-1:7*bw] = Q[q][7];
-
-    #`CLK_HALF clk = 1'b1;  
-
-  end
-
-
-  #`CLK_HALF clk = 1'b0;  
-  qmem_wr = 0; 
-  qkmem_add = 0;
-  #`CLK_HALF clk = 1'b1;  
-///////////////////////////////////////////
-
-
-
-
-
-///// Kmem writing  /////
-
-$display("##### Kmem writing #####");
-
-  for (q=0; q<col; q=q+1) begin
-
-    #`CLK_HALF clk = 1'b0;  
-    kmem_wr = 1; if (q>0) qkmem_add = qkmem_add + 1; 
-    
-    mem_in[1*bw-1:0*bw] = K[q][0];
-    mem_in[2*bw-1:1*bw] = K[q][1];
-    mem_in[3*bw-1:2*bw] = K[q][2];
-    mem_in[4*bw-1:3*bw] = K[q][3];
-    mem_in[5*bw-1:4*bw] = K[q][4];
-    mem_in[6*bw-1:5*bw] = K[q][5];
-    mem_in[7*bw-1:6*bw] = K[q][6];
-    mem_in[8*bw-1:7*bw] = K[q][7];
-
-    #`CLK_HALF clk = 1'b1;  
-
-  end
-
-  #`CLK_HALF clk = 1'b0;  
-  kmem_wr = 0;  
-  qkmem_add = 0;
-  #`CLK_HALF clk = 1'b1;  
-///////////////////////////////////////////
-
-
-
-  for (q=0; q<2; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;  
-    #`CLK_HALF clk = 1'b1;   
-  end
-
-
-
-
-/////  K data loading  /////
-$display("##### K data loading to processor #####");
-
-  for (q=0; q<col+1; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;  
-    load = 1; 
-    if (q==1) kmem_rd = 1;
-    if (q>1) begin
-       qkmem_add = qkmem_add + 1;
-    end
-
-    #`CLK_HALF clk = 1'b1;  
-  end
-
-  #`CLK_HALF clk = 1'b0;  
-  kmem_rd = 0; qkmem_add = 0;
-  #`CLK_HALF clk = 1'b1;  
-
-  #`CLK_HALF clk = 1'b0;  
-  load = 0; 
-  #`CLK_HALF clk = 1'b1;  
-
-///////////////////////////////////////////
-
- for (q=0; q<10; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;   
-    #`CLK_HALF clk = 1'b1;   
- end
-
-
-
-
-
-///// execution  /////
-$display("##### execute #####");
-
-  for (q=0; q<total_cycle; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;  
-    execute = 1; 
-    qmem_rd = 1;
-
-    if (q>0) begin
-       qkmem_add = qkmem_add + 1;
-    end
-
-    #`CLK_HALF clk = 1'b1;  
-  end
-
-  #`CLK_HALF clk = 1'b0;  
-  qmem_rd = 0; qkmem_add = 0; execute = 0;
-  #`CLK_HALF clk = 1'b1;  
-
-
-///////////////////////////////////////////
-
- for (q=0; q<10; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;   
-    #`CLK_HALF clk = 1'b1;   
- end
-
-
-
-
-////////////// output fifo rd and wb to psum mem ///////////////////
-
-$display("##### move ofifo to pmem #####");
-
-  for (q=0; q<total_cycle; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;  
-    ofifo_rd = 1; 
-    pmem_wr = 1; 
-
-    if (q>0) begin
-       pmem_add = pmem_add + 1;
-    end
-
-    #`CLK_HALF clk = 1'b1;  
-  end
-
-  #`CLK_HALF clk = 1'b0;  
-  pmem_wr = 0; pmem_add = 0; ofifo_rd = 0;
-  #`CLK_HALF clk = 1'b1;  
-
-///////////////////////////////////////////
-
-
-
-
-///////// readout from pmem and self-check ///////////
-
-$display("##### readout from pmem #####");
-
-  errors   = 0;
-  pass_cnt = 0;
-
-  // pmem is a synchronous-read SRAM (Q <= memory[A] on posedge), so a word
-  // requested at one posedge is only stable in the next time step. The loop
-  // runs one extra iteration: it checks the row requested in the previous
-  // iteration, then issues the next address.
-  for (q=0; q<total_cycle+1; q=q+1) begin
-
-    #`CLK_HALF clk = 1'b0;  
-
-    if (q>0) begin
-      if (out === golden[q-1]) begin
-        pass_cnt = pass_cnt + 1;
-        $display("row %0d PASS: %40h", q-1, out);
-      end
-      else begin
-        errors = errors + 1;
-        $display("row %0d FAIL: got %40h exp %40h", q-1, out, golden[q-1]);
-      end
-    end
-
-    if (q<total_cycle) begin
-      pmem_rd  = 1; 
-      pmem_add = q; 
-    end
-    else begin
-      pmem_rd = 0; 
-    end
-
-    #`CLK_HALF clk = 1'b1;  
-
-  end
-
-  #`CLK_HALF clk = 1'b0;  
-  pmem_rd = 0; pmem_add = 0;
-  #`CLK_HALF clk = 1'b1;  
-
-  $display("##### RESULT: %0d PASS / %0d FAIL #####", pass_cnt, errors);
-
-///////////////////////////////////////////
-
-
-
-///// normalize pass A: one sum per row into the sum fifo /////
-
-$display("##### normalize pass A: accumulate #####");
-
-  // pmem is a synchronous-read sram, so address a row one cycle before its
-  // data is needed. This first edge only primes row 0.
-  #`CLK_HALF clk = 1'b0;  
-  pmem_rd  = 1; 
-  pmem_add = 0; 
-  #`CLK_HALF clk = 1'b1;  
-
-  for (q=0; q<total_cycle; q=q+1) begin
-    #`CLK_HALF clk = 1'b0;  
-    acc = 1;                    // sfp_in currently holds row q
-    if (q < total_cycle-1) begin
-      pmem_rd  = 1;             // fetch row q+1 while row q accumulates
-      pmem_add = q + 1; 
-    end
-    else pmem_rd = 0; 
-    #`CLK_HALF clk = 1'b1;  
-  end
-
-  // fifo_wr is still high for one more edge, which is where row 7 s sum lands
-  #`CLK_HALF clk = 1'b0;  
-  acc = 0; pmem_add = 0;
-  #`CLK_HALF clk = 1'b1;  
-
-///////////////////////////////////////////
-
-
-///// normalize pass B: divide each row by its own sum and write it back /////
-
-$display("##### normalize pass B: divide and write back #####");
-
-  // div has to be a one cycle pulse. div_q pops the sum fifo one cycle later,
-  // so holding div high would divide two consecutive rows by the same sum.
-  for (q=0; q<total_cycle; q=q+1) begin
-
-    // address the row
-    #`CLK_HALF clk = 1'b0;  
-    pmem_rd  = 1; 
-    pmem_wr  = 0; 
-    norm     = 0; 
-    pmem_add = q; 
-    #`CLK_HALF clk = 1'b1;  
-
-    // divide: sfp_out registers |row q| / (sum_q >> 7)
-    #`CLK_HALF clk = 1'b0;  
-    pmem_rd = 0; 
-    div     = 1; 
-    #`CLK_HALF clk = 1'b1;  
-
-    // write the registered result back to the same address; the fifo pops here
-    #`CLK_HALF clk = 1'b0;  
-    div      = 0; 
-    norm     = 1; 
-    pmem_wr  = 1; 
-    pmem_add = q; 
-    #`CLK_HALF clk = 1'b1;  
-
-  end
-
-  #`CLK_HALF clk = 1'b0;  
-  norm = 0; pmem_wr = 0; pmem_add = 0;
-  #`CLK_HALF clk = 1'b1;  
-
-///////////////////////////////////////////
-
-
-///// readout after normalization /////
-
-$display("##### readout after normalization #####");
-
-  errors   = 0;
-  pass_cnt = 0;
-
-  for (q=0; q<total_cycle+1; q=q+1) begin
-
-    #`CLK_HALF clk = 1'b0;  
-
-    if (q>0) begin
-      if (out === golden_norm[q-1]) begin
-        pass_cnt = pass_cnt + 1;
-        $display("norm row %0d PASS: %40h", q-1, out);
-      end
-      else begin
-        errors = errors + 1;
-        $display("norm row %0d FAIL: got %40h exp %40h", q-1, out, golden_norm[q-1]);
-      end
-    end
-
-    if (q<total_cycle) begin
-      pmem_rd  = 1; 
-      pmem_add = q; 
-    end
-    else begin
-      pmem_rd = 0; 
-    end
-
-    #`CLK_HALF clk = 1'b1;  
-
-  end
-
-  #`CLK_HALF clk = 1'b0;  
-  pmem_rd = 0; pmem_add = 0;
-  #`CLK_HALF clk = 1'b1;  
-
-  $display("##### NORM RESULT: %0d PASS / %0d FAIL #####", pass_cnt, errors);
-
-///////////////////////////////////////////
-
-
-
-
+  $dumpvars(0, fullchip_tb);
+  $display("##### clk0 period %0.3f ns, clk1 period %0.3f ns #####",
+           2.0*`CLK0_HALF, 2.0*`CLK1_HALF);
+  wait (done0 && done1);
+  if (err0 + err1 == 0)
+    $display("##### ALL PASS #####");
+  else
+    $display("##### %0d FAIL IN TOTAL #####", err0 + err1);
   #10 $finish;
+end
 
-
+// A lost handshake leaves a driver waiting at a barrier forever; stop instead.
+initial begin
+  repeat (20000) @(posedge clk0);
+  $display("##### TIMEOUT: a driver is stuck (bar0=%0d bar1=%0d) #####", bar0, bar1);
+  $finish;
 end
 
 endmodule
 
 
+// One core's stimulus, on that core's clock. Inputs change on the falling edge
+// and are sampled on the next rising edge, as in the step 3 testbench.
+module core_drv (clk, reset, inst, mem_in, out, bar, bar_other, done, errors_total);
+
+parameter ID          = 0;
+parameter KFILE       = "kdata_core0.txt";
+parameter KFILE_OTHER = "kdata_core1.txt";   // only for the other core's row sums
+parameter NFILE       = "norm_core0.txt";
+parameter bw          = 8;
+parameter bw_psum     = 2*bw+4;
+parameter pr          = 8;
+parameter col         = 8;
+parameter total_cycle = 8;
+
+// Cycles of this core's clock to wait after a sum_xfer pulse, before the
+// barrier. One transfer takes at most 7 sender + 6 receiver cycles end to end
+// (the load cycle, then four crossings of a two-flop synchronizer plus one
+// cycle for the state machine to act on each). Waiting 20 own cycles and then
+// meeting at a barrier means at least 20 cycles of the slower clock have
+// passed, so both transfers are over and both senders are back in S_IDLE.
+parameter XFER_WAIT   = 20;
+
+input                       clk;
+output reg                  reset;
+output [20:0]               inst;
+output reg [pr*bw-1:0]      mem_in;
+input  [bw_psum*col-1:0]    out;
+output reg [7:0]            bar;
+input  [7:0]                bar_other;
+output reg                  done;
+output reg [31:0]           errors_total;
+
+reg sum_xfer = 0;
+reg norm = 0;
+reg div  = 0;
+reg acc  = 0;
+reg ofifo_rd = 0;
+reg execute = 0;
+reg load = 0;
+reg qmem_rd = 0;
+reg qmem_wr = 0;
+reg kmem_rd = 0;
+reg kmem_wr = 0;
+reg pmem_rd = 0;
+reg pmem_wr = 0;
+reg [3:0] qkmem_add = 0;
+reg [3:0] pmem_add = 0;
+
+assign inst[20]    = sum_xfer;
+assign inst[19]    = norm;
+assign inst[18]    = div;
+assign inst[17]    = acc;
+assign inst[16]    = ofifo_rd;
+assign inst[15:12] = qkmem_add;
+assign inst[11:8]  = pmem_add;
+assign inst[7]     = execute;
+assign inst[6]     = load;
+assign inst[5]     = qmem_rd;
+assign inst[4]     = qmem_wr;
+assign inst[3]     = kmem_rd;
+assign inst[2]     = kmem_wr;
+assign inst[1]     = pmem_rd;
+assign inst[0]     = pmem_wr;
+
+// ponytail: every matrix here is 8 x 8 (total_cycle = col = pr = 8), so one
+// 3-D array holds all five and a run just names which two it multiplies.
+localparam MQ = 0, MK = 1, MKO = 2, MN = 3, MV = 4;
+integer M [0:4][0:7][0:7];
+
+integer R  [0:7][0:7];     // product of the run being modelled
+integer RO [0:7][0:7];     // the other core's Q x K, for its row sums
+reg [bw_psum*col-1:0] golden      [0:total_cycle-1];
+reg [bw_psum*col-1:0] golden_norm [0:total_cycle-1];
+reg [bw_psum*col-1:0] golden_nv   [0:total_cycle-1];
+
+integer fd, scan, val, i, j, k, q, t, s_own, s_oth, divisor, pass_cnt, errors;
+reg [bw_psum-1:0]     elem;
+reg [bw_psum*col-1:0] rowv;
+
+task cyc;                       // wait for this core's falling edge
+  @(negedge clk);
+endtask
+
+task idle(input integer n);
+  for (i = 0; i < n; i = i + 1) cyc;
+endtask
+
+// Generation-count barrier: no flag to clear, so no race between a fast
+// driver re-entering and a slow one still leaving the previous barrier.
+task barrier;
+  begin
+    bar = bar + 1;
+    wait (bar_other >= bar);
+  end
+endtask
+
+task read_mat(input integer m);
+  begin
+    for (i = 0; i < 8; i = i + 1)
+      for (j = 0; j < 8; j = j + 1) begin
+        scan = $fscanf(fd, "%d", val);
+        M[m][i][j] = val;
+      end
+    $fclose(fd);
+  end
+endtask
+
+// R[t][c] = sum_k M[ma][t][k] * M[mb][c][k] - what the mac array computes
+task mul(input integer ma, input integer mb);
+  for (t = 0; t < 8; t = t + 1)
+    for (q = 0; q < 8; q = q + 1) begin
+      R[t][q] = 0;
+      for (k = 0; k < 8; k = k + 1)
+        R[t][q] = R[t][q] + M[ma][t][k] * M[mb][q][k];
+    end
+endtask
+
+// column 0 ends up in the top bits, as in the step 3 testbench
+task pack_row(input integer t2);
+  for (q = 0; q < col; q = q + 1) begin
+    elem   = R[t2][q];
+    rowv = {rowv[bw_psum*(col-1)-1:0], elem};
+  end
+endtask
+
+// write the two operand matrices, load K, execute, move ofifo -> pmem
+task run_qk(input integer ma, input integer mb);
+  begin
+    // qmem
+    for (q = 0; q < total_cycle; q = q + 1) begin
+      cyc;
+      qmem_wr = 1; if (q > 0) qkmem_add = qkmem_add + 1;
+      for (k = 0; k < pr; k = k + 1) mem_in[k*bw +: bw] = M[ma][q][k];
+    end
+    cyc; qmem_wr = 0; qkmem_add = 0;
+
+    // kmem
+    for (q = 0; q < col; q = q + 1) begin
+      cyc;
+      kmem_wr = 1; if (q > 0) qkmem_add = qkmem_add + 1;
+      for (k = 0; k < pr; k = k + 1) mem_in[k*bw +: bw] = M[mb][q][k];
+    end
+    cyc; kmem_wr = 0; qkmem_add = 0;
+    idle(2);
+
+    // K into the processor
+    for (q = 0; q < col+1; q = q + 1) begin
+      cyc;
+      load = 1;
+      if (q == 1) kmem_rd = 1;
+      if (q > 1)  qkmem_add = qkmem_add + 1;
+    end
+    cyc; kmem_rd = 0; qkmem_add = 0;
+    cyc; load = 0;
+    idle(10);
+
+    // execute
+    for (q = 0; q < total_cycle; q = q + 1) begin
+      cyc;
+      execute = 1; qmem_rd = 1;
+      if (q > 0) qkmem_add = qkmem_add + 1;
+    end
+    cyc; qmem_rd = 0; qkmem_add = 0; execute = 0;
+    idle(10);
+
+    // ofifo -> pmem
+    for (q = 0; q < total_cycle; q = q + 1) begin
+      cyc;
+      ofifo_rd = 1; pmem_wr = 1;
+      if (q > 0) pmem_add = pmem_add + 1;
+    end
+    cyc; pmem_wr = 0; pmem_add = 0; ofifo_rd = 0;
+  end
+endtask
+
+// pmem is a synchronous-read SRAM: the loop checks the row requested in the
+// previous iteration, then issues the next address.
+task readout(input integer which);
+  begin
+    pass_cnt = 0;
+    errors   = 0;
+    for (q = 0; q < total_cycle+1; q = q + 1) begin
+      cyc;
+      if (q > 0) begin
+        rowv = (which == 0) ? golden[q-1] :
+                 (which == 1) ? golden_norm[q-1] : golden_nv[q-1];
+        if (out === rowv) begin
+          pass_cnt = pass_cnt + 1;
+          $display("core%0d %s row %0d PASS: %40h", ID,
+                   (which == 0) ? "qk  " : (which == 1) ? "norm" : "nv  ", q-1, out);
+        end
+        else begin
+          errors = errors + 1;
+          $display("core%0d %s row %0d FAIL: got %40h exp %40h", ID,
+                   (which == 0) ? "qk  " : (which == 1) ? "norm" : "nv  ", q-1, out, rowv);
+        end
+      end
+      if (q < total_cycle) begin pmem_rd = 1; pmem_add = q; end
+      else                       pmem_rd = 0;
+    end
+    cyc; pmem_rd = 0; pmem_add = 0;
+    errors_total = errors_total + errors;
+    $display("##### core%0d %s: %0d PASS / %0d FAIL #####", ID,
+             (which == 0) ? "RESULT     " : (which == 1) ? "NORM RESULT" : "NV RESULT  ",
+             pass_cnt, errors);
+  end
+endtask
 
 
+initial begin
+  reset = 1;
+  done  = 0;
+  bar   = 0;
+  errors_total = 0;
+  mem_in = 0;
+
+  fd = $fopen("qdata.txt",  "r"); read_mat(MQ);
+  fd = $fopen(KFILE,        "r"); read_mat(MK);
+  fd = $fopen(KFILE_OTHER,  "r"); read_mat(MKO);
+  fd = $fopen(NFILE,        "r"); read_mat(MN);
+  fd = $fopen("vdata.txt",  "r"); read_mat(MV);
+
+  // golden: Q x K of this core
+  mul(MQ, MK);
+  for (t = 0; t < total_cycle; t = t + 1) begin pack_row(t); golden[t] = rowv; end
+  for (t = 0; t < 8; t = t + 1) for (q = 0; q < 8; q = q + 1) RO[t][q] = R[t][q];
+
+  // golden: normalization, with the other core's row sums from its own K
+  mul(MQ, MKO);
+  for (t = 0; t < total_cycle; t = t + 1) begin
+    s_own = 0; s_oth = 0;
+    for (q = 0; q < col; q = q + 1) begin
+      s_own = s_own + ((RO[t][q] < 0) ? -RO[t][q] : RO[t][q]);
+      s_oth = s_oth + ((R[t][q]  < 0) ? -R[t][q]  : R[t][q]);
+    end
+    divisor = (s_own >> 7) + (s_oth >> 7);
+    if (divisor == 0)
+      $display("WARNING core%0d row %0d: divisor is 0, the rtl divide will produce x", ID, t);
+    for (q = 0; q < col; q = q + 1) begin
+      elem   = ((RO[t][q] < 0) ? -RO[t][q] : RO[t][q]) / divisor;
+      rowv = {rowv[bw_psum*(col-1)-1:0], elem};
+    end
+    golden_norm[t] = rowv;
+  end
+
+  // golden: norm x V
+  mul(MN, MV);
+  for (t = 0; t < total_cycle; t = t + 1) begin pack_row(t); golden_nv[t] = rowv; end
+
+  idle(12);
+  reset = 0;
+
+  ///// run 1: Q x K /////
+  $display("##### core%0d: Q x K #####", ID);
+  run_qk(MQ, MK);
+  readout(0);
+
+  ///// normalize pass A: one row sum per row into both sum fifos /////
+  cyc; pmem_rd = 1; pmem_add = 0;          // prime row 0
+  for (q = 0; q < total_cycle; q = q + 1) begin
+    cyc;
+    acc = 1;
+    if (q < total_cycle-1) begin pmem_rd = 1; pmem_add = q + 1; end
+    else                         pmem_rd = 0;
+  end
+  cyc; acc = 0; pmem_add = 0;              // the last sum lands on this edge
+  idle(2);
+
+  ///// normalize pass B: exchange row sums, then divide /////
+  $display("##### core%0d: exchange and divide #####", ID);
+  for (t = 0; t < total_cycle; t = t + 1) begin
+    // Both cores have finished dividing the previous row, so no new transfer
+    // can overwrite a sum_rx that is still waiting for its divide.
+    barrier;
+    cyc; sum_xfer = 1;                     // send this core's row t sum
+    cyc; sum_xfer = 0;
+    idle(XFER_WAIT);
+    barrier;                               // both transfers of row t are done
+
+    cyc; pmem_rd = 1; pmem_wr = 0; norm = 0; pmem_add = t;   // address row t
+    cyc; pmem_rd = 0; div = 1;                                // divide
+    cyc; div = 0; norm = 1; pmem_wr = 1; pmem_add = t;        // write back
+  end
+  cyc; norm = 0; pmem_wr = 0; pmem_add = 0;
+  readout(1);
+
+  ///// run 2: norm x V, after a reset of this core /////
+  // No exchange is in flight: the last barrier above came after both senders
+  // were back in S_IDLE.
+  cyc; reset = 1;
+  idle(12);
+  reset = 0;
+  $display("##### core%0d: norm x V #####", ID);
+  run_qk(MN, MV);
+  readout(2);
+
+  done = 1;
+end
+
+endmodule
