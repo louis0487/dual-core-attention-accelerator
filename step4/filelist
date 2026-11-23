@@ -1,4 +1,3 @@
-./verilog/fullchip_tb.v
 ./verilog/fullchip.v
 ./verilog/core.v
 ./verilog/sum_xchg.v
