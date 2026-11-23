@@ -383,8 +383,11 @@ initial begin
     cyc; pmem_rd = 1; pmem_wr = 0; norm = 0; pmem_add = t;   // address row t
     cyc; pmem_rd = 0; div = 1;                                // divide
     cyc; div = 0; norm = 1; pmem_wr = 1; pmem_add = t;        // write back
+    // Drop the write right away. The next row starts with a barrier and an
+    // exchange that change nothing else, so a write left on would rewrite
+    // row t on every cycle of it.
+    cyc; norm = 0; pmem_wr = 0; pmem_add = 0;
   end
-  cyc; norm = 0; pmem_wr = 0; pmem_add = 0;
   readout(1);
 
   ///// run 2: norm x V, after a reset of this core /////
