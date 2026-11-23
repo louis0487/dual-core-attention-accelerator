@@ -1,5 +1,5 @@
 
-module sum_xchg.v (clk, reset, sum_xfer, fifo_head, fifo_pop, sum_rx, tx_data, tx_req, tx_ack, rx_data, rx_req, rx_ack);
+module sum_xchg (clk, reset, sum_xfer, fifo_head, fifo_pop, sum_rx, tx_data, tx_req, tx_ack, rx_data, rx_req, rx_ack);
 // synopsys sync_set_reset "reset"
   parameter W = 24;
   localparam [1:0] S_IDLE = 2'd0,
@@ -22,6 +22,18 @@ module sum_xchg.v (clk, reset, sum_xfer, fifo_head, fifo_pop, sum_rx, tx_data, t
   wire ack_s;
   wire req_s; 
   
+  sync sync_ack_inst (
+	.clk(clk),
+	.in(tx_ack),
+	.out(ack_s)
+  );
+  
+  sync sync_req_inst (
+	.clk(clk),
+	.in(rx_req),
+	.out(req_s)
+  );
+
   always@(posedge clk) begin
 	if(reset) begin
 		s_state  <= S_IDLE;

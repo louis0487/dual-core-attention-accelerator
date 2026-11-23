@@ -1,20 +1,27 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
-module core (clk, sum_out, mem_in, out, inst, reset);
+module core (clk, tx_data, tx_req, tx_ack, rx_data, rx_req, rx_ack, mem_in, out, inst, reset);
 
 parameter col = 8;
 parameter bw = 8;
 parameter bw_psum = 2*bw+4;
 parameter pr = 8;
 
-output [bw_psum+3:0] sum_out;
 output [bw_psum*col-1:0] out;
 wire   [bw_psum*col-1:0] pmem_out;
 input  [pr*bw-1:0] mem_in;
 input  clk;
-input  [19:0] inst; 
+input  [20:0] inst; 
 input  reset;
+input  tx_ack, rx_req;
+output tx_req, rx_ack;
+input  [bw_psum+3:0] rx_data;
+output [bw_psum+3:0] tx_data;
 
+wire  [bw_psum+3:0] fifo_head;
+wire  [bw_psum+3:0] sum_rx;
+wire  fifo_pop;
+wire  sum_xfer;
 wire  [pr*bw-1:0] mac_in;
 wire  [pr*bw-1:0] kmem_out;
 wire  [pr*bw-1:0] qmem_out;
@@ -37,6 +44,7 @@ wire  norm;
 wire  acc;
 wire  div;
 
+assign sum_xfer = inst[20];
 assign norm = inst[19];
 assign div  = inst[18];
 assign acc  = inst[17];
@@ -106,15 +114,28 @@ sfp_row #(.col(col), .bw(bw), .bw_psum(bw_psum)) sfp_row_instance (
 	.clk(clk),
 	.reset(reset),
 	.sfp_in(pmem_out),
-	.sum_in({(bw_psum+4){1'b0}}),
-	.sum_out(sum_out),
+	.sum_in(sum_rx),
+	.sum_out(fifo_head),
 	.sfp_out(sfp_out),
 	.acc(acc),
 	.div(div),
-	.fifo_ext_rd(1'b0)
+	.fifo_ext_rd(fifo_pop)
 );
 
-
+sum_xchg #(.W(bw_psum+4)) xchg_inst (
+	.clk(clk),
+	.reset(reset),
+	.sum_xfer(sum_xfer),
+	.fifo_head(fifo_head),
+	.fifo_pop(fifo_pop),
+	.sum_rx(sum_rx),
+	.tx_ack(tx_ack),
+	.tx_req(tx_req),
+	.rx_req(rx_req),
+	.rx_ack(rx_ack),
+	.tx_data(tx_data),
+	.rx_data(rx_data)	
+);
 
   //////////// For printing purpose ////////////
   always @(posedge clk) begin
