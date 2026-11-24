@@ -1,8 +1,21 @@
 #!/bin/sh
-# Gate-level simulation of the routed step 3 netlist.
+# Gate-level simulation for step 4, carried over from step 3.
 #
-# Run from step3/, after place-and-route has written fullchip.pnr.v and
-# fullchip_WC.sdf into this directory. COURSE_PDK must point at the PDK root.
+# Run from step4/. COURSE_PDK must point at the PDK root.
+#
+# CORE=1 is the gate between core synthesis and core place-and-route (R4 M3):
+# the testbench wires two copies of the mapped core itself (+define+CORE_GLS),
+# with the behavioural memory models behind the macro names, so the only gate
+# level part is the core netlist. No SDF exists at that point:
+#   CORE=1 NO_SDF=1 ./run_gui 2>&1 | tee gls_core.log
+# NETLIST defaults to ./netlist/core.out.v in this mode.
+#
+# Without CORE the script runs the mapped fullchip (+define+GLS). That is the
+# step 3 arrangement below; the three-level step 4 run (R4 M5) still has to
+# add the core netlist to it.
+#
+# The fullchip mode expects place-and-route to have written fullchip.pnr.v and
+# fullchip_WC.sdf into this directory.
 # The cell models are referenced where they live, so no foundry file is ever
 # copied into this tree.
 #
@@ -27,14 +40,12 @@
 #                              to stdout - a piped log will hold only the
 #                              elaboration messages.
 #
-# The clock runs at 5.0 ns here, not at the 1.0 ns target. Post-route setup
-# WNS is -2.151 ns at 1.0 ns (timingReports/postRoute.summary, second PnR run),
-# so static timing puts the minimum period at 1.0 + 2.151 = 3.151 ns, useful
-# skew included; the testbench also gives its inputs only half a period of
-# setup. Tighten it from the command line to find where the SDF-annotated
-# netlist stops working - failing near 3.15 ns would be an independent check on
-# the static timing number:
-#   CLK_HALF=1.6 ./run_gui      -> 3.2 ns period
+# The two testbench clocks default to 1.0 and 1.3 ns. A zero-delay run does
+# not care. An SDF run needs both periods above what static timing reports for
+# the routed netlist - step 3 needed 3.151 ns (post-route setup WNS -2.151 ns
+# at 1.0 ns, second PnR run) - and the testbench gives its inputs only half a
+# period of setup. Keep the two periods unrelated:
+#   CLK0_HALF=2.0 CLK1_HALF=2.6 ./run_gui
 #
 # SEQ_UDP gives sequential UDPs a floor delay. It is ON by default for NO_SDF
 # runs only: a netlist simulated without SDF has no delays at all, so data and
@@ -106,20 +117,47 @@ esac
 # DC map the rest the same way via the sync_set_reset directive.
 if [ -n "${INIT0:-}" ]; then INIT_OPT="-initreg0 -initmem0"; else INIT_OPT=; fi
 
-# CLK_HALF=<ns> overrides the clock half period, whose GLS default lives in
-# the testbench. Two things set the floor here. Static timing needs 3.151 ns,
+# CLK0_HALF / CLK1_HALF=<ns> override the two clock half periods, whose
+# defaults live in the testbench. The step 3 note on the floor, for one clock:
+# two things set it. Static timing needs 3.151 ns,
 # and the clock insertion delay spans 0.303 to 1.951 ns
 # (fullchip.post_route.skew.rpt): a flop whose clock arrives later than the
 # testbench changes its inputs captures the next cycle's value one cycle
 # early, which in step 1 showed up as fifo columns reading one row behind.
 # Slowing the simulation clock past both is the standard remedy and claims
 # nothing about design speed; the frequency claim rests on STA.
-#   CLK_HALF=2.0 ./run_gui
-if [ -n "${CLK_HALF:-}" ]; then CLK_DEF=+define+CLK_HALF=$CLK_HALF; else CLK_DEF=; fi
+#   CLK0_HALF=2.0 CLK1_HALF=2.6 ./run_gui
+CLK_DEF=
+if [ -n "${CLK0_HALF:-}" ]; then CLK_DEF="$CLK_DEF +define+CLK0_HALF=$CLK0_HALF"; fi
+if [ -n "${CLK1_HALF:-}" ]; then CLK_DEF="$CLK_DEF +define+CLK1_HALF=$CLK1_HALF"; fi
 
 if [ -n "${RTL:-}" ]; then
     GLS_DEF=
-    SRC="-f ./filelist"
+    # The step 4 filelist holds the RTL only, so the testbench comes first
+    # here, where its timescale also covers the RTL files after it.
+    SRC="./verilog/fullchip_tb.v -f ./filelist"
+elif [ -n "${CORE:-}" ]; then
+    GLS_DEF=+define+CORE_GLS
+
+    # Synthesis writes the port-only memory stubs into the netlist too (see
+    # the fullchip branch below), so strip them the same way. The memories
+    # are the behavioural models here, not the Stage A netlists: this run
+    # checks the core netlist and nothing else, and it should not wait on the
+    # Stage A files being copied into subckt/.
+    NL=${NETLIST:-./netlist/core.out.v}
+    [ -r "$NL" ] || { echo "run_gui: cannot read netlist $NL" >&2; exit 1; }
+    mkdir -p gls
+    GLS_NL=gls/$(basename "$NL" .v).gls.v
+    MACRO_DEF='^module sram_w16_sram_bit(64|160)[ (]'
+    n=$(grep -cE "$MACRO_DEF" "$NL")
+    awk -v re="$MACRO_DEF" '$0 ~ re {skip=1} !skip {print} /^endmodule/ {if (skip) skip=0}' "$NL" > "$GLS_NL"
+    echo "run_gui: $NL -> $GLS_NL, $n macro module definition(s) removed"
+
+    SRC="-v $GLS_NL \
+	 -v ./verilog/sram_macro_model.v \
+	 -v ./verilog/sram_w16.v \
+	 -v $COURSE_PDK/verilog/tcbn65gplus.v \
+	 ./verilog/fullchip_tb.v"
 else
     GLS_DEF=+define+GLS
 

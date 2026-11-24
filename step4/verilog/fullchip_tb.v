@@ -22,6 +22,10 @@
 // of the normalization - they do not match the hardware model of this Q/K data
 // - so the normalization is checked against the model, as in step 3.
 //
+// What the testbench drives: the fullchip RTL by default; the mapped fullchip
+// with +define+GLS; two mapped cores and no fullchip with +define+CORE_GLS
+// (run_gui sets either one).
+//
 // Override the clocks from the command line, e.g. +define+CLK1_HALF=2.0.
 // Keep the two periods unrelated (not an integer ratio): the point of this
 // step is that the cores do not share a clock.
@@ -55,6 +59,26 @@ wire [7:0]        bar0, bar1;
 wire              done0, done1;
 wire [31:0]       err0, err1;
 
+`ifdef CORE_GLS
+// Gate check on the synthesized core alone (R4 M3): two copies of the mapped
+// core, wired here exactly as fullchip.v wires them. fullchip.v itself cannot
+// be used for this - it passes parameters to core, and the mapped core has
+// none left.
+wire [bw_psum+3:0] x01_data, x10_data;
+wire               x01_req, x01_ack, x10_req, x10_ack;
+
+core core_instance0 (
+      .clk(clk0), .reset(reset0), .inst(inst0), .mem_in(mem_in0), .out(out0),
+      .tx_data(x01_data), .tx_req(x01_req), .tx_ack(x01_ack),
+      .rx_data(x10_data), .rx_req(x10_req), .rx_ack(x10_ack)
+);
+
+core core_instance1 (
+      .clk(clk1), .reset(reset1), .inst(inst1), .mem_in(mem_in1), .out(out1),
+      .tx_data(x10_data), .tx_req(x10_req), .tx_ack(x10_ack),
+      .rx_data(x01_data), .rx_req(x01_req), .rx_ack(x01_ack)
+);
+`else
 // Synthesis resolves the parameters into the netlist, so the mapped fullchip
 // has an empty parameter list and the gate-level build instantiates it bare.
 `ifdef GLS
@@ -65,6 +89,7 @@ fullchip #(.bw(bw), .bw_psum(bw_psum), .col(col), .pr(pr)) fullchip_instance (
       .clk0(clk0), .reset0(reset0), .inst0(inst0), .mem_in0(mem_in0), .out0(out0),
       .clk1(clk1), .reset1(reset1), .inst1(inst1), .mem_in1(mem_in1), .out1(out1)
 );
+`endif
 
 core_drv #(.ID(0), .KFILE("kdata_core0.txt"), .KFILE_OTHER("kdata_core1.txt"),
            .NFILE("norm_core0.txt")) drv0 (
