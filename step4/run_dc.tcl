@@ -1,4 +1,4 @@
-set top_module fullchip
+set top_module core
 set rtlPath "./verilog"
 
 # Target library
@@ -39,21 +39,16 @@ set compile_no_new_cells_at_top_level false
 set hdlin_enable_vpp true
 set hdlin_auto_save_templates false
 
-# Parallel execution. compile_ultra uses up to this many cores on the same
-# machine (syn_command.pdf, printed page 2127: the default is 1, which means
-# no parallel execution, and the maximum is 16). The speedup is not linear -
-# only parts of the compile are threaded - and ieng6 is shared, so keep the
-# number modest. report_host_options prints what is in effect, and a compile
-# whose reported CPU time exceeds its elapsed time is the sign that the
-# threads are actually running.
+
 set_host_options -max_cores 4
 
 define_design_lib WORK -path template
 set verilogout_single_bit false
 
 # read RTL
-analyze -format verilog -lib WORK fullchip.v
+#analyze -format verilog -lib WORK fullchip.v
 analyze -format verilog -lib WORK core.v
+analyze -format verilog -lib WORK sum_xchg.v
 analyze -format verilog -lib WORK mac_array.v
 analyze -format verilog -lib WORK mac_col.v
 analyze -format verilog -lib WORK mac_8in.v
@@ -63,18 +58,6 @@ analyze -format verilog -lib WORK fifo_depth16.v
 analyze -format verilog -lib WORK fifo_mux_16_1.v
 analyze -format verilog -lib WORK fifo_mux_8_1.v
 analyze -format verilog -lib WORK fifo_mux_2_1.v
-# The memories are hard macros now, not logic. The behavioural RTL stays out
-# and the stub below only declares their ports.
-#
-# Leaving sram_w16.v out is not enough on its own. elaborate also looks in the
-# WORK design library, and that directory survives between runs unless the
-# cleanup at the top of this script removes the same path define_design_lib
-# points at. Stage A analyzed sram_w16.v into the library in this directory,
-# so the first Stage B runs found it there and synthesized all three memories
-# as flip-flops anyway, 1088 + 1088 + 2720 = 4896 of them. The clock fanout
-# shows it: 9085 loads with the stale library, 4192 with the stubs, which is
-# 9085 - 4896 plus the three macro clock pins.
-#analyze -format verilog -lib WORK sram_w16.v
 analyze -format verilog -lib WORK sram_macro_stub.v
 analyze -format verilog -lib WORK sync.v
 
