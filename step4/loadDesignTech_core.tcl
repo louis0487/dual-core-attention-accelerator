@@ -17,7 +17,7 @@ set netlist           "./netlist/$design.out.v"
 # ${top_module}.sdc from this directory), so both tools use one file and it
 # cannot drift. The per-macro SDCs live in constraints/ because Stage A put
 # them there.
-set sdc               "./$design.sdc"
+set sdc               "./constraints/$design.sdc"
 
 set best_timing_lib   "$libdir/lib/tcbn65gplusbc.lib"
 set worst_timing_lib  "$libdir/lib/tcbn65gpluswc.lib"

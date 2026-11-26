@@ -43,14 +43,14 @@ globalNetConnect VSS -type pgpin -pin VSS -inst * -verbose
 # an ordinary cell, and its macro placement did nothing without an error.
 # placeInstance snaps to the nearest site and fixes the instance by default
 # (innovusTCR p.2397).
-placeInstance core_instance/psum_mem_instance 20 20  $ori_pmem
-placeInstance core_instance/qmem_instance     20 118 $ori_qk
-placeInstance core_instance/kmem_instance     20 418 $ori_qk
+placeInstance psum_mem_instance 20 20  $ori_pmem
+placeInstance qmem_instance     20 118 $ori_qk
+placeInstance kmem_instance     20 418 $ori_qk
 
 # Halos only after placement: the manual defines them on the current
 # orientation (p.761).
 foreach m {psum_mem_instance qmem_instance kmem_instance} {
-    addHaloToBlock 10 10 10 10 core_instance/$m
+    addHaloToBlock 10 10 10 10 $m
 }
 
 # No standard cell rows under the macros (cutRow with no options cuts them at
