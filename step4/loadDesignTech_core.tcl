@@ -10,7 +10,7 @@
 # second path is read as the start of another option.
 
 set libdir            $env(COURSE_PDK)
-set design            "fullchip"
+set design            "core"
 set netlist           "./netlist/$design.out.v"
 
 # The chip SDC stays where Design Compiler reads it (run_dc.tcl sources
